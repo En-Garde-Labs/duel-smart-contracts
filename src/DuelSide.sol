@@ -6,12 +6,10 @@ error DuelSide__Unauthorized();
 error DuelSide__PayoutFailed();
 
 contract DuelSide {
-    
     address public duelAddress;
     uint256 public amount;
     uint256 public fundingTime;
     string public option;
-
 
     event PayoutSent(address indexed payoutAddress, uint256 amount);
 
@@ -30,10 +28,11 @@ contract DuelSide {
     receive() external payable {}
 
     function sendPayout(address payable _payoutAddress) public {
-        if(msg.sender != duelAddress) revert DuelSide__Unauthorized();
+        if (msg.sender != duelAddress) revert DuelSide__Unauthorized();
         (bool success, ) = _payoutAddress.call{value: address(this).balance}(
             ""
         );
+        // TBD: add duel fee to duel wallet
         if (!success) revert DuelSide__PayoutFailed();
         emit PayoutSent(_payoutAddress, address(this).balance);
     }
