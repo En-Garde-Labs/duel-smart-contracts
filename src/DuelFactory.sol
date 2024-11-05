@@ -13,8 +13,9 @@ error DuelFactory__InvalidDecidingTime();
 error DuelFactory__InvalidAmount();
 error DuelFactory__InvalidETHValue();
 error DuelFactory__InvalidImplementation();
+error DuelFactory__InvalidPlayerB();
 
-contract DuelFactory is Ownable {
+contract DuelFactory is Ownable, Pausable {
     uint256 private _nextDuelId;
     address public duelImplementation;
     address public duelWallet;
@@ -54,7 +55,9 @@ contract DuelFactory is Ownable {
         uint256 _fundingTime,
         uint256 _decidingTime,
         address _judge
-    ) public payable {
+    ) public payable whenNotPaused {
+        if (_playerB == msg.sender || _playerB == address(0))
+            revert DuelFactory__InvalidPlayerB();
         if (_fundingTime > fundingTimeLimit)
             revert DuelFactory__InvalidFundingTime();
         if (_decidingTime > decidingTimeLimit)
@@ -131,5 +134,13 @@ contract DuelFactory is Ownable {
     function setDecidingTimeLimit(uint256 _newLimit) public onlyOwner {
         decidingTimeLimit = _newLimit;
         emit NewDecidingTimeLimit(_newLimit);
+    }
+
+    function pause() public onlyOwner whenNotPaused {
+        _pause();
+    }
+
+    function unpause() public onlyOwner whenPaused {
+        _unpause();
     }
 }
