@@ -14,14 +14,16 @@ error DuelFactory__InvalidAmount();
 error DuelFactory__InvalidETHValue();
 error DuelFactory__InvalidImplementation();
 error DuelFactory__InvalidPlayerB();
+error DuelSide__InvalidFee();
 
 contract DuelFactory is Ownable, Pausable {
+    
     uint256 private _nextDuelId;
-    address public duelImplementation;
-    address public duelWallet;
-    uint256 public duelFee;
+    uint256 public duelFee; // Percentage. E.g. 'duelFee = 1' -> 1%
     uint256 public fundingTimeLimit;
     uint256 public decidingTimeLimit;
+    address public duelImplementation;
+    address public duelWallet;
 
     event NewImplementation(address indexed newImplementation);
     event DuelCreated(uint256 indexed tokenId, address indexed duel);
@@ -37,6 +39,7 @@ contract DuelFactory is Ownable, Pausable {
         uint256 _fundingTimeLimit,
         uint256 _decidingTimeLimit
     ) Ownable(msg.sender) {
+        if (_duelFee > 100) revert DuelSide__InvalidFee();
         duelImplementation = _duelImplementation;
         duelWallet = _duelWallet;
         duelFee = _duelFee;
@@ -44,7 +47,6 @@ contract DuelFactory is Ownable, Pausable {
         decidingTimeLimit = _decidingTimeLimit;
     }
 
-    // createDuel's caller is PLAYER A
     function createDuel(
         string memory _title,
         string memory _optionADescription,
@@ -69,14 +71,12 @@ contract DuelFactory is Ownable, Pausable {
         ERC1967Proxy proxy = new ERC1967Proxy(
             duelImplementation,
             abi.encodeWithSignature(
-                "initialize(uint256,address,address,string,string,string,address,address,address,uint256,uint256,address)",
+                "initialize(uint256,address,address,string,address,address,address,uint256,uint256,address)",
                 abi.encodePacked(
                     duelId,
                     address(this),
                     duelWallet,
                     _title, // duel's title
-                    _optionADescription, // duel's option A
-                    _optionBDescription, // duel's option B
                     _payoutA, // payout wallet for option A
                     msg.sender, // player A
                     _playerB,
@@ -86,18 +86,22 @@ contract DuelFactory is Ownable, Pausable {
                 )
             )
         );
-        // duelSideA contract must be funded with value > 0
+
         DuelSide duelSideA = new DuelSide{value: msg.value}(
             address(proxy),
             _optionADescription,
             _amount,
-            _fundingTime
+            block.timestamp,
+            _fundingTime,
+            duelFee
         );
         DuelSide duelSideB = new DuelSide(
             address(proxy),
             _optionBDescription,
+            block.timestamp,
             _amount,
-            _fundingTime
+            _fundingTime,
+            duelFee
         );
 
         IDuel(address(proxy)).setOptionsAddresses(
@@ -121,12 +125,12 @@ contract DuelFactory is Ownable, Pausable {
     }
 
     function setFee(uint256 _newFee) public onlyOwner {
+        if (_newFee > 100) revert DuelSide__InvalidFee();
         duelFee = _newFee;
         emit NewFee(_newFee);
     }
 
     function setFundingTimeLimit(uint256 _newLimit) public onlyOwner {
-        // if(_newLimit < 3600 (1 hour)) revert with error message
         fundingTimeLimit = _newLimit;
         emit NewFundingTimeLimit(_newLimit);
     }
