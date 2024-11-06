@@ -16,7 +16,6 @@ contract DuelSide {
     uint256 public fundingTime;
     uint256 public duelFee; // An integer between 0 and 100
     address public duelAddress;
-    string public option;
 
     mapping(address user => uint256 balance) public balances;
 
@@ -25,7 +24,6 @@ contract DuelSide {
 
     constructor(
         address _duelAddress,
-        string memory _option,
         uint256 _amount,
         uint256 _creationTime,
         uint256 _fundingTime,
@@ -35,7 +33,6 @@ contract DuelSide {
         amount = _amount;
         creationTime = _creationTime;
         fundingTime = _fundingTime;
-        option = _option;
         duelFee = _duelFee;
     }
 

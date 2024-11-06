@@ -49,8 +49,6 @@ contract DuelFactory is Ownable, Pausable {
 
     function createDuel(
         string memory _title,
-        string memory _optionADescription,
-        string memory _optionBDescription,
         address _payoutA,
         address _playerB,
         uint256 _amount,
@@ -89,7 +87,6 @@ contract DuelFactory is Ownable, Pausable {
 
         DuelSide duelSideA = new DuelSide{value: msg.value}(
             address(proxy),
-            _optionADescription,
             _amount,
             block.timestamp,
             _fundingTime,
@@ -97,7 +94,6 @@ contract DuelFactory is Ownable, Pausable {
         );
         DuelSide duelSideB = new DuelSide(
             address(proxy),
-            _optionBDescription,
             block.timestamp,
             _amount,
             _fundingTime,
