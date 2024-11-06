@@ -3,9 +3,9 @@
 pragma solidity ^0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
-import {HelperConfig} from "./HelperConfig.sol";
-import {Duel} from "../src/Duel.sol";
-import {DuelFactory} from "../src/DuelFactory.sol";
+import {HelperConfig} from "./HelperConfig.s.sol";
+import {Duel} from "src/Duel.sol";
+import {DuelFactory} from "src/DuelFactory.sol";
 
 contract Deploy is Script {
     HelperConfig helperConfig;

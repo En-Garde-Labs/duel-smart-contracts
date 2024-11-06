@@ -165,7 +165,6 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     }
 
     function playersAgree(address _winner) public updatesStatus {
-        updateStatus();
         require(judge == address(0), "Judge exists");
         require(msg.sender == playerA || msg.sender == playerB, "Not a player");
         require(_winner == optionA || _winner == optionB, "Invalid winner");
