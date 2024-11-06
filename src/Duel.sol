@@ -17,6 +17,7 @@ error DuelImplementation__InvalidWinner();
 error DuelImplementation__PayoutFailed();
 error DuelImplementation__DuelExpired();
 error DuelImplementation__NoJudge();
+error DuelImplementation__Unauthorized();
 
 interface IDuel {
     function setOptionsAddresses(address _optionA, address _optionB) external;
@@ -29,6 +30,7 @@ interface IDuel {
     }
 
     function updateStatus() external;
+
     function getStatus() external view returns (uint8);
 }
 
@@ -55,6 +57,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
 
     event NewDuelWallet(address indexed newWallet);
     event ParticipantAccepted(address indexed participant);
+    event PayoutAddressSet(address indexed player, address indexed payoutAddress);
     event DuelCompleted(address indexed winner);
     event DuelExpired();
 
@@ -172,6 +175,19 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
                 _distributePayout(_winner);
             }
         }
+    }
+
+    function setPayoutAddress(
+        address _payoutAddress
+    ) public onlyDuringFundingTime updatesStatus {
+        if (msg.sender == playerA) {
+            payoutA = _payoutAddress;
+        } else if (msg.sender == playerB) {
+            payoutB = _payoutAddress;
+        } else {
+            revert DuelImplementation__Unauthorized();
+        }
+        emit PayoutAddressSet(msg.sender, _payoutAddress);
     }
 
     function setOptionsAddresses(address _optionA, address _optionB) public {
