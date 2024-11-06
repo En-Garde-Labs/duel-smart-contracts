@@ -2,13 +2,15 @@
 
 pragma solidity ^0.8.24;
 
+import {IDuel} from "./Duel.sol";
+
 error DuelSide__Unauthorized();
 error DuelSide__PayoutFailed();
 error DuelSide__AmountExceeded();
 error DuelSide__FundingTimeEnded();
+error DuelSide__DuelNotExpired();
 
 contract DuelSide {
-    
     uint256 public amount;
     uint256 public creationTime;
     uint256 public fundingTime;
@@ -38,9 +40,10 @@ contract DuelSide {
     }
 
     receive() external payable {
-      if(address(this).balance > amount) revert DuelSide__AmountExceeded();
-      if(block.timestamp > creationTime + fundingTime) revert DuelSide__FundingTimeEnded();
-      balances[msg.sender] += msg.value;
+        if (address(this).balance > amount) revert DuelSide__AmountExceeded();
+        if (block.timestamp > creationTime + fundingTime)
+            revert DuelSide__FundingTimeEnded();
+        balances[msg.sender] += msg.value;
     }
 
     function sendPayout(
@@ -48,7 +51,7 @@ contract DuelSide {
         address _duelWallet
     ) public {
         if (msg.sender != duelAddress) revert DuelSide__Unauthorized();
-        uint256 _duelFee = address(this).balance * (duelFee * 100) / 10000;
+        uint256 _duelFee = (address(this).balance * (duelFee * 100)) / 10000;
         uint256 _payoutAmount = address(this).balance - _duelFee;
         (bool payoutSuccess, ) = _payoutAddress.call{value: _payoutAmount}("");
         (bool feeSuccess, ) = payable(_duelWallet).call{value: _duelFee}("");
@@ -57,12 +60,19 @@ contract DuelSide {
     }
 
     function claimFunds() public {
-        // TBD - check if duel has expired
+        // Request status update from Duel contract
+        IDuel duel = IDuel(duelAddress);
+        duel.updateStatus();
+
+        IDuel.Status duelStatus = IDuel.Status(duel.getStatus());
+        if (duelStatus != IDuel.Status.EXPIRED) {
+            revert DuelSide__DuelNotExpired();
+        }
         uint256 _amount = balances[msg.sender];
+        require(_amount > 0, "No funds to claim");
         balances[msg.sender] = 0;
         (bool success, ) = msg.sender.call{value: _amount}("");
         if (!success) revert DuelSide__PayoutFailed();
         emit FundsClaimed(msg.sender, _amount);
     }
-
 }

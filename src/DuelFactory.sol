@@ -14,7 +14,7 @@ error DuelFactory__InvalidAmount();
 error DuelFactory__InvalidETHValue();
 error DuelFactory__InvalidImplementation();
 error DuelFactory__InvalidPlayerB();
-error DuelSide__InvalidFee();
+error DuelFactory__InvalidFee();
 
 contract DuelFactory is Ownable, Pausable {
     
@@ -39,7 +39,7 @@ contract DuelFactory is Ownable, Pausable {
         uint256 _fundingTimeLimit,
         uint256 _decidingTimeLimit
     ) Ownable(msg.sender) {
-        if (_duelFee > 100) revert DuelSide__InvalidFee();
+        if (_duelFee > 100) revert DuelFactory__InvalidFee();
         duelImplementation = _duelImplementation;
         duelWallet = _duelWallet;
         duelFee = _duelFee;
@@ -125,7 +125,7 @@ contract DuelFactory is Ownable, Pausable {
     }
 
     function setFee(uint256 _newFee) public onlyOwner {
-        if (_newFee > 100) revert DuelSide__InvalidFee();
+        if (_newFee > 100) revert DuelFactory__InvalidFee();
         duelFee = _newFee;
         emit NewFee(_newFee);
     }

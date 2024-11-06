@@ -16,18 +16,23 @@ error DuelImplementation__FundingFailed();
 error DuelImplementation__InvalidWinner();
 error DuelImplementation__PayoutFailed();
 error DuelImplementation__DuelExpired();
+error DuelImplementation__NoJudge();
 
 interface IDuel {
     function setOptionsAddresses(address _optionA, address _optionB) external;
-}
 
-contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     enum Status {
         DRAFT,
         ACTIVE,
-        COMPLETED
+        COMPLETED,
+        EXPIRED
     }
 
+    function updateStatus() external;
+    function getStatus() external view returns (uint8);
+}
+
+contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     address public factory;
     uint256 public duelId;
     address public duelWallet;
@@ -40,15 +45,18 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     address public playerA;
     address public playerB;
     address public judge;
+    address public agreedWinner;
     uint256 public creationTime;
     uint256 public fundingTime;
     uint256 public decidingTime;
     string public title;
     Status public status;
+    mapping(address => bool) public playerAgreed;
 
     event NewDuelWallet(address indexed newWallet);
     event ParticipantAccepted(address indexed participant);
     event DuelCompleted(address indexed winner);
+    event DuelExpired();
 
     modifier onlyDuringFundingTime() {
         if (block.timestamp > creationTime + fundingTime)
@@ -61,6 +69,11 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
             block.timestamp < creationTime + fundingTime ||
             block.timestamp > creationTime + fundingTime + decidingTime
         ) revert DuelImplementation__NotDecidingTime();
+        _;
+    }
+
+    modifier updatesStatus() {
+        updateStatus();
         _;
     }
 
@@ -78,6 +91,9 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     ) public initializer {
         __Ownable_init(_playerA);
         __UUPSUpgradeable_init();
+        if (judge == address(0)) {
+            judgeAccepted = true;
+        }
         duelId = _duelId;
         factory = _factory;
         duelWallet = _duelWallet;
@@ -91,7 +107,8 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         judge = _judge;
     }
 
-    function judgeAccept() public onlyDuringFundingTime {
+    function judgeAccept() public onlyDuringFundingTime updatesStatus {
+        if (judge == address(0)) revert DuelImplementation__NoJudge();
         if (msg.sender != judge) revert DuelImplementation__OnlyJudge();
         if (judgeAccepted) revert DuelImplementation__AlreadyAccepted();
         judgeAccepted = true;
@@ -105,7 +122,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
 
     function playerBAccept(
         address _payoutB
-    ) public payable onlyDuringFundingTime {
+    ) public payable onlyDuringFundingTime updatesStatus {
         if (playerBAccepted) revert DuelImplementation__AlreadyAccepted();
         if (msg.sender != playerB) revert DuelImplementation__OnlyPlayerB();
         if (msg.value == 0) revert DuelImplementation__InvalidETHValue();
@@ -123,7 +140,9 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         emit ParticipantAccepted(playerB);
     }
 
-    function judgeDecide(address _winner) public onlyDuringDecidingTime {
+    function judgeDecide(
+        address _winner
+    ) public onlyDuringDecidingTime updatesStatus {
         if (status != Status.ACTIVE) revert DuelImplementation__DuelExpired();
         if (msg.sender != judge) revert DuelImplementation__OnlyJudge();
         if (_winner != optionA && _winner != optionB)
@@ -131,6 +150,59 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
 
         status = Status.COMPLETED;
 
+        _distributePayout(_winner);
+    }
+
+    function playersAgree(address _winner) public updatesStatus {
+        updateStatus();
+        require(judge == address(0), "Judge exists");
+        require(msg.sender == playerA || msg.sender == playerB, "Not a player");
+        require(_winner == optionA || _winner == optionB, "Invalid winner");
+        require(status == Status.ACTIVE, "Duel not active");
+        require(!playerAgreed[msg.sender], "Player already agreed");
+
+        if (agreedWinner == address(0)) {
+            agreedWinner = _winner;
+            playerAgreed[msg.sender] = true;
+        } else {
+            require(agreedWinner == _winner, "Players disagree on winner");
+            playerAgreed[msg.sender] = true;
+            if (playerAgreed[playerA] && playerAgreed[playerB]) {
+                status = Status.COMPLETED;
+                _distributePayout(_winner);
+            }
+        }
+    }
+
+    function setOptionsAddresses(address _optionA, address _optionB) public {
+        if (msg.sender != factory) revert DuelImplementation__OnlyFactory();
+        optionA = _optionA;
+        optionB = _optionB;
+    }
+
+    function updateStatus() public {
+        if (status == Status.DRAFT) {
+            if (block.timestamp > creationTime + fundingTime) {
+                status = Status.EXPIRED;
+                emit DuelExpired();
+            }
+        } else if (status == Status.ACTIVE) {
+            if (block.timestamp > creationTime + fundingTime + decidingTime) {
+                status = Status.EXPIRED;
+                emit DuelExpired();
+            }
+        }
+    }
+
+    function getStatus() public view returns (uint8) {
+        return uint8(status);
+    }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
+
+    function _distributePayout(address _winner) internal {
         (bool sentPayoutA, ) = optionA.call(
             abi.encodeWithSignature(
                 "sendPayout(address,address)",
@@ -150,14 +222,4 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
 
         emit DuelCompleted(_winner);
     }
-
-    function setOptionsAddresses(address _optionA, address _optionB) public {
-        if (msg.sender != factory) revert DuelImplementation__OnlyFactory();
-        optionA = _optionA;
-        optionB = _optionB;
-    }
-
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
 }
