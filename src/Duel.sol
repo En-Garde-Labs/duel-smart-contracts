@@ -57,7 +57,10 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
 
     event NewDuelWallet(address indexed newWallet);
     event ParticipantAccepted(address indexed participant);
-    event PayoutAddressSet(address indexed player, address indexed payoutAddress);
+    event PayoutAddressSet(
+        address indexed player,
+        address indexed payoutAddress
+    );
     event DuelCompleted(address indexed winner);
     event DuelExpired();
 
@@ -78,6 +81,11 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     modifier updatesStatus() {
         updateStatus();
         _;
+    }
+   
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
     function initialize(
