@@ -54,7 +54,7 @@ contract DuelFactory is Ownable, Pausable {
         uint256 _fundingTime,
         uint256 _decidingTime,
         address _judge
-    ) public payable whenNotPaused {
+    ) public payable whenNotPaused returns(address){
         if (_playerB == msg.sender || _playerB == address(0))
             revert DuelFactory__InvalidPlayerB();
         if (_fundingTime > fundingTimeLimit)
@@ -103,6 +103,7 @@ contract DuelFactory is Ownable, Pausable {
         );
         
         emit DuelCreated(duelId, address(proxy));
+        return address(proxy);
     }
 
     function setImplementation(address _newImplementation) public onlyOwner {

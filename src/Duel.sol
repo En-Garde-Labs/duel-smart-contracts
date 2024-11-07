@@ -9,7 +9,7 @@ error DuelImplementation__OnlyFactory();
 error DuelImplementation__OnlyJudge();
 error DuelImplementation__OnlyPlayerB();
 error DuelImplementation__FundingTimeExceeded();
-error DuelImplementation__AlreadyAccepted();
+error DuelImplementation__AlreadyAccepted(address);
 error DuelImplementation__NotDecidingTime();
 error DuelImplementation__InvalidETHValue();
 error DuelImplementation__FundingFailed();
@@ -121,7 +121,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     function judgeAccept() public onlyDuringFundingTime updatesStatus {
         if (judge == address(0)) revert DuelImplementation__NoJudge();
         if (msg.sender != judge) revert DuelImplementation__OnlyJudge();
-        if (judgeAccepted) revert DuelImplementation__AlreadyAccepted();
+        if (judgeAccepted) revert DuelImplementation__AlreadyAccepted(judge);
         judgeAccepted = true;
 
         if (playerBAccepted) {
@@ -134,7 +134,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     function playerBAccept(
         address _payoutB
     ) public payable onlyDuringFundingTime updatesStatus {
-        if (playerBAccepted) revert DuelImplementation__AlreadyAccepted();
+        if (playerBAccepted) revert DuelImplementation__AlreadyAccepted(playerB);
         if (msg.sender != playerB) revert DuelImplementation__OnlyPlayerB();
         if (msg.value == 0) revert DuelImplementation__InvalidETHValue();
 

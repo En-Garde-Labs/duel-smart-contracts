@@ -18,8 +18,6 @@ contract DeployTests is Script {
     function run() public returns(Duel, DuelFactory) {
         Duel duel = deployDuelImplementation();
         DuelFactory factory = deployDuelFactory(address(duel));
-        console.log("Duel implementation deployed at: ", address(duel));
-        console.log("Duel factory deployed at: ", address(factory));
         return (duel, factory);
     }
 

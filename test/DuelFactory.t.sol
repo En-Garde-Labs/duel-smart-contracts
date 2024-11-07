@@ -11,10 +11,13 @@ import {DuelSide} from "src/DuelSide.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DuelFactoryTest is Test {
+    
+    // Config contracts
     HelperConfig helperConfig;
     HelperConfig.NetworkConfig config;
     DeployTests deploy;
 
+    // Errors
     error DuelFactory__InvalidFundingTime();
     error DuelFactory__InvalidPlayerB();
 
@@ -28,7 +31,6 @@ contract DuelFactoryTest is Test {
     address duelWallet = 0x7611A60c2346f3D193f65B051eD6Ae93239FF25e;
 
     // Users
-    address owner = address(this);
     address playerA = address(0x1);
     address playerB = address(0x2);
     address judge = address(0x3);

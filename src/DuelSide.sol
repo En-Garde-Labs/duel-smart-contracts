@@ -3,6 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {IDuel} from "./Duel.sol";
+import {console} from "forge-std/console.sol";
 
 error DuelSide__Unauthorized();
 error DuelSide__PayoutFailed();
@@ -37,6 +38,8 @@ contract DuelSide {
     }
 
     receive() external payable {
+      console.log("balance", address(this).balance);
+      console.log("amount", amount);
         if (address(this).balance > amount) revert DuelSide__AmountExceeded();
         if (block.timestamp > creationTime + fundingTime)
             revert DuelSide__FundingTimeEnded();
