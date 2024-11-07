@@ -1,320 +1,298 @@
-// // SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 
-// pragma solidity ^0.8.24;
+pragma solidity ^0.8.24;
 
-// import {Test, console} from "forge-std/Test.sol";
-// import {Deploy} from "script/DeployTests.s.sol";
-// import {DuelFactory} from "src/DuelFactory.sol";
-// import {Duel} from "src/Duel.sol";
-// import {DuelSide} from "src/DuelSide.sol";
-// import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Test, console, Vm} from "forge-std/Test.sol";
+import {HelperConfig} from "script/HelperConfig.s.sol";
+import {DeployTests} from "script/DeployTests.s.sol";
+import {DuelFactory} from "src/DuelFactory.sol";
+import {Duel} from "src/Duel.sol";
+import {DuelSide} from "src/DuelSide.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-// contract DuelFactoryTest is Test {
-//     // Contracts
-//     DuelFactory duelFactory;
-//     Duel duelImplementation;
-//     address duelImplementationAddress;
-//     address duelWallet = address(0xdeadbeef); // Example duel wallet
+contract DuelFactoryTest is Test {
+    HelperConfig helperConfig;
+    HelperConfig.NetworkConfig config;
+    DeployTests deploy;
 
-//     // Users
-//     address owner = address(this);
-//     address playerA = address(0x1);
-//     address playerB = address(0x2);
-//     address judge = address(0x3);
+    error DuelFactory__InvalidFundingTime();
+    error DuelFactory__InvalidPlayerB();
 
-//     // Test variables
-//     uint256 duelFee = 2; // 2%
-//     uint256 fundingTimeLimit = 1 weeks;
-//     uint256 decidingTimeLimit = 1 weeks;
+    // Events
+    event DuelCreated(uint256 indexed duelId, address indexed duelAddress);
 
-//     function setUp() public {
-//         // Deploy the Duel implementation contract
-//         duelImplementation = new Duel();
-//         duelImplementationAddress = address(duelImplementation);
+    // Contracts
+    DuelFactory duelFactory;
+    Duel duelImplementation;
+    address duelImplementationAddress;
+    address duelWallet = 0x7611A60c2346f3D193f65B051eD6Ae93239FF25e;
 
-//         // Deploy the DuelFactory contract
-//         duelFactory = new DuelFactory(
-//             duelImplementationAddress,
-//             duelWallet,
-//             duelFee,
-//             fundingTimeLimit,
-//             decidingTimeLimit
-//         );
-//     }
+    // Users
+    address owner = address(this);
+    address playerA = address(0x1);
+    address playerB = address(0x2);
+    address judge = address(0x3);
 
-//     function testDeployment() public {
-//         assertEq(duelFactory.duelImplementation(), duelImplementationAddress);
-//         assertEq(duelFactory.duelWallet(), duelWallet);
-//         assertEq(duelFactory.duelFee(), duelFee);
-//         assertEq(duelFactory.fundingTimeLimit(), fundingTimeLimit);
-//         assertEq(duelFactory.decidingTimeLimit(), decidingTimeLimit);
-//     }
+    // Test variables
+    uint256 duelFee = 100; // 1%
+    uint256 fundingTimeLimit = 1 weeks;
+    uint256 decidingTimeLimit = 1 weeks;
 
-//     function testCreateDuel() public {
-//         // Prepare inputs
-//         string memory title = "Test Duel";
-//         string memory optionADescription = "Option A";
-//         string memory optionBDescription = "Option B";
-//         address payoutA = address(0x4);
-//         uint256 amount = 1 ether;
-//         uint256 fundingTime = 3 days;
-//         uint256 decidingTime = 2 days;
+    function setUp() public {
+        helperConfig = new HelperConfig();
+        config = helperConfig.getConfig();
+        deploy = new DeployTests();
+        (duelImplementation, duelFactory) = deploy.run();
 
-//         // Start impersonating playerA
-//         vm.startPrank(playerA);
+        duelImplementationAddress = address(duelImplementation);
+    }
 
-//         // Call createDuel with valid inputs
-//         vm.deal(playerA, amount);
-//         vm.expectEmit(true, true, false, false);
-//         emit DuelCreated(0, address(0)); // We don't know the duel address yet
+    function testDeployment() public view {
+        assertEq(duelFactory.duelImplementation(), duelImplementationAddress);
+        assertEq(duelFactory.duelWallet(), duelWallet);
+        assertEq(duelFactory.duelFee(), duelFee);
+        assertEq(duelFactory.fundingTimeLimit(), fundingTimeLimit);
+        assertEq(duelFactory.decidingTimeLimit(), decidingTimeLimit);
+    }
 
-//         duelFactory.createDuel{value: amount}(
-//             title,
-//             optionADescription,
-//             optionBDescription,
-//             payoutA,
-//             playerB,
-//             amount,
-//             fundingTime,
-//             decidingTime,
-//             judge
-//         );
+    function testCreateDuel() public {
+        string memory title = "Test Duel";
+        address payoutA = address(0x4);
+        uint256 amount = 1 ether;
+        uint256 fundingTime = 3 days;
+        uint256 decidingTime = 2 days;
 
-//         // Stop impersonation
-//         vm.stopPrank();
-//     }
+        vm.startPrank(playerA);
 
-//     function testCreateDuelInvalidPlayerB() public {
-//         // Prepare inputs where playerB is the same as playerA
-//         string memory title = "Test Duel";
-//         string memory optionADescription = "Option A";
-//         string memory optionBDescription = "Option B";
-//         address payoutA = address(0x4);
-//         uint256 amount = 1 ether;
-//         uint256 fundingTime = 3 days;
-//         uint256 decidingTime = 2 days;
+        vm.deal(playerA, amount);
+        vm.expectEmit(false, false, false, false);
+        emit DuelCreated(0, address(0));
 
-//         // Start impersonating playerA
-//         vm.startPrank(playerA);
+        duelFactory.createDuel{value: amount}(
+            title,
+            payoutA,
+            playerB,
+            amount,
+            fundingTime,
+            decidingTime,
+            judge
+        );
 
-//         // Expect revert
-//         vm.expectRevert(DuelFactory__InvalidPlayerB.selector);
+        vm.stopPrank();
+    }
 
-//         duelFactory.createDuel{value: amount}(
-//             title,
-//             optionADescription,
-//             optionBDescription,
-//             payoutA,
-//             playerA, // Invalid: playerB is the same as playerA
-//             amount,
-//             fundingTime,
-//             decidingTime,
-//             judge
-//         );
+    function testCreateDuelInvalidPlayerB() public {
+        // Prepare inputs where playerB is the same as playerA
+        string memory title = "Test Duel";
+        address payoutA = address(0x4);
+        uint256 amount = 1 ether;
+        uint256 fundingTime = 3 days;
+        uint256 decidingTime = 2 days;
 
-//         vm.stopPrank();
-//     }
+        vm.deal(playerA, amount);
+        vm.startPrank(playerA);
 
-//     function testCreateDuelInvalidFundingTime() public {
-//         // Prepare inputs with fundingTime exceeding the limit
-//         string memory title = "Test Duel";
-//         string memory optionADescription = "Option A";
-//         string memory optionBDescription = "Option B";
-//         address payoutA = address(0x4);
-//         uint256 amount = 1 ether;
-//         uint256 fundingTime = fundingTimeLimit + 1 days; // Exceeds limit
-//         uint256 decidingTime = 2 days;
+        vm.expectRevert(DuelFactory__InvalidPlayerB.selector);
 
-//         // Start impersonating playerA
-//         vm.startPrank(playerA);
+        duelFactory.createDuel{value: amount}(
+            title,
+            payoutA,
+            playerA, // Invalid: playerB is the same as playerA
+            amount,
+            fundingTime,
+            decidingTime,
+            judge
+        );
 
-//         // Expect revert
-//         vm.expectRevert(DuelFactory__InvalidFundingTime.selector);
+        vm.stopPrank();
+    }
 
-//         duelFactory.createDuel{value: amount}(
-//             title,
-//             optionADescription,
-//             optionBDescription,
-//             payoutA,
-//             playerB,
-//             amount,
-//             fundingTime,
-//             decidingTime,
-//             judge
-//         );
+    function testCreateDuelInvalidFundingTime() public {
+        // Prepare inputs with fundingTime exceeding the limit
+        string memory title = "Test Duel";
+        address payoutA = address(0x4);
+        uint256 amount = 1 ether;
+        uint256 fundingTime = fundingTimeLimit + 1 days; // Exceeds limit
+        uint256 decidingTime = 2 days;
 
-//         vm.stopPrank();
-//     }
+        vm.deal(playerA, amount);
+        vm.startPrank(playerA);
 
-//     function testSetImplementation() public {
-//         address newImplementation = address(new Duel());
+        vm.expectRevert(DuelFactory__InvalidFundingTime.selector);
 
-//         // Only owner can call
-//         vm.prank(owner);
-//         duelFactory.setImplementation(newImplementation);
-//         assertEq(duelFactory.duelImplementation(), newImplementation);
+        duelFactory.createDuel{value: amount}(
+            title,
+            payoutA,
+            playerB,
+            amount,
+            fundingTime,
+            decidingTime,
+            judge
+        );
 
-//         // Non-owner cannot call
-//         vm.prank(playerA);
-//         vm.expectRevert("Ownable: caller is not the owner");
-//         duelFactory.setImplementation(newImplementation);
-//     }
+        vm.stopPrank();
+    }
 
-//     function testPauseUnpause() public {
-//         // Only owner can call pause
-//         vm.prank(playerA);
-//         vm.expectRevert("Ownable: caller is not the owner");
-//         duelFactory.pause();
+    function testSetImplementation() public {
+        address newImplementation = address(new Duel());
 
-//         vm.prank(owner);
-//         duelFactory.pause();
-//         assertTrue(duelFactory.paused());
+        // Only owner can call
+        vm.prank(config.account);
 
-//         // Cannot create duel when paused
-//         vm.prank(playerA);
-//         vm.expectRevert("Pausable: paused");
-//         duelFactory.createDuel(
-//             "Test",
-//             "Option A",
-//             "Option B",
-//             address(0x0),
-//             playerB,
-//             1 ether,
-//             1 days,
-//             1 days,
-//             judge
-//         );
+        duelFactory.setImplementation(newImplementation);
+        assertEq(duelFactory.duelImplementation(), newImplementation);
 
-//         // Only owner can call unpause
-//         vm.prank(playerA);
-//         vm.expectRevert("Ownable: caller is not the owner");
-//         duelFactory.unpause();
+        // Non-owner cannot call
+        vm.prank(playerA);
+        vm.expectRevert();
+        duelFactory.setImplementation(newImplementation);
+    }
 
-//         vm.prank(owner);
-//         duelFactory.unpause();
-//         assertFalse(duelFactory.paused());
-//     }
+    function testPauseUnpause() public {
+        // Only owner can call pause
+        vm.prank(playerA);
+        vm.expectRevert();
+        duelFactory.pause();
 
-//     function testCreateDuelEmitsEvent() public {
-//         string memory title = "Test Duel";
-//         string memory optionADescription = "Option A";
-//         string memory optionBDescription = "Option B";
-//         address payoutA = address(0x4);
-//         uint256 amount = 1 ether;
-//         uint256 fundingTime = 3 days;
-//         uint256 decidingTime = 2 days;
+        vm.prank(config.account);
+        duelFactory.pause();
+        assertTrue(duelFactory.paused());
 
-//         // Start impersonating playerA
-//         vm.startPrank(playerA);
+        // Cannot create duel when paused
+        vm.prank(playerA);
+        vm.expectRevert();
+        duelFactory.createDuel(
+            "Test",
+            address(0x0),
+            playerB,
+            1 ether,
+            1 days,
+            1 days,
+            judge
+        );
 
-//         vm.deal(playerA, amount);
+        // Only owner can call unpause
+        vm.prank(playerA);
+        vm.expectRevert();
+        duelFactory.unpause();
 
-//         // Capture the DuelCreated event
-//         vm.recordLogs();
+        vm.prank(config.account);
+        duelFactory.unpause();
+        assertFalse(duelFactory.paused());
+    }
 
-//         duelFactory.createDuel{value: amount}(
-//             title,
-//             optionADescription,
-//             optionBDescription,
-//             payoutA,
-//             playerB,
-//             amount,
-//             fundingTime,
-//             decidingTime,
-//             judge
-//         );
+    function testCreateDuelEmitsEvent() public {
+        string memory title = "Test Duel";
+        address payoutA = address(0x4);
+        uint256 amount = 1 ether;
+        uint256 fundingTime = 3 days;
+        uint256 decidingTime = 2 days;
 
-//         Vm.Log[] memory entries = vm.getRecordedLogs();
+        // Start impersonating playerA
+        vm.startPrank(playerA);
 
-//         // Find the DuelCreated event
-//         bytes32 eventSignature = keccak256("DuelCreated(uint256,address)");
-//         bool eventFound = false;
-//         uint256 duelId;
-//         address duelAddress;
+        vm.deal(playerA, amount);
 
-//         for (uint256 i = 0; i < entries.length; i++) {
-//             if (entries[i].topics[0] == eventSignature) {
-//                 duelId = uint256(entries[i].topics[1]);
-//                 duelAddress = address(uint160(uint256(entries[i].topics[2])));
-//                 eventFound = true;
-//                 break;
-//             }
-//         }
+        // Capture the DuelCreated event
+        vm.recordLogs();
 
-//         require(eventFound, "DuelCreated event not found");
-//         assertEq(duelId, 0); // First duel, so ID should be 0
-//         assertTrue(duelAddress != address(0));
+        duelFactory.createDuel{value: amount}(
+            title,
+            payoutA,
+            playerB,
+            amount,
+            fundingTime,
+            decidingTime,
+            judge
+        );
 
-//         vm.stopPrank();
-//     }
+        Vm.Log[] memory entries = vm.getRecordedLogs();
 
-//     function testCreateDuelContractsDeployed() public {
-//         // Prepare inputs
-//         string memory title = "Test Duel";
-//         string memory optionADescription = "Option A";
-//         string memory optionBDescription = "Option B";
-//         address payoutA = address(0x4);
-//         uint256 amount = 1 ether;
-//         uint256 fundingTime = 3 days;
-//         uint256 decidingTime = 2 days;
+        // Find the DuelCreated event
+        bytes32 eventSignature = keccak256("DuelCreated(uint256,address)");
+        bool eventFound = false;
+        uint256 duelId;
+        address duelAddress;
 
-//         // Start impersonating playerA
-//         vm.startPrank(playerA);
+        for (uint256 i = 0; i < entries.length; i++) {
+            if (entries[i].topics[0] == eventSignature) {
+                duelId = uint256(entries[i].topics[1]);
+                duelAddress = address(uint160(uint256(entries[i].topics[2])));
+                eventFound = true;
+                break;
+            }
+        }
 
-//         vm.deal(playerA, amount);
+        require(eventFound, "DuelCreated event not found");
+        assertEq(duelId, 0); // First duel, so ID should be 0
+        assertTrue(duelAddress != address(0));
 
-//         // Capture the DuelCreated event
-//         vm.recordLogs();
+        vm.stopPrank();
+    }
 
-//         duelFactory.createDuel{value: amount}(
-//             title,
-//             optionADescription,
-//             optionBDescription,
-//             payoutA,
-//             playerB,
-//             amount,
-//             fundingTime,
-//             decidingTime,
-//             judge
-//         );
+    function testCreateDuelContractsDeployed() public {
+        // Prepare inputs
+        string memory title = "Test Duel";
+        address payoutA = address(0x4);
+        uint256 amount = 1 ether;
+        uint256 fundingTime = 3 days;
+        uint256 decidingTime = 2 days;
 
-//         Vm.Log[] memory entries = vm.getRecordedLogs();
+        // Start impersonating playerA
+        vm.startPrank(playerA);
 
-//         // Find the DuelCreated event
-//         bytes32 eventSignature = keccak256("DuelCreated(uint256,address)");
-//         address duelAddress;
+        vm.deal(playerA, amount);
 
-//         for (uint256 i = 0; i < entries.length; i++) {
-//             if (entries[i].topics[0] == eventSignature) {
-//                 duelAddress = address(uint160(uint256(entries[i].topics[2])));
-//                 break;
-//             }
-//         }
+        // Capture the DuelCreated event
+        vm.recordLogs();
 
-//         require(duelAddress != address(0), "Duel contract not deployed");
+        duelFactory.createDuel{value: amount}(
+            title,
+            payoutA,
+            playerB,
+            amount,
+            fundingTime,
+            decidingTime,
+            judge
+        );
 
-//         // Interact with the Duel contract
-//         Duel duel = Duel(duelAddress);
+        Vm.Log[] memory entries = vm.getRecordedLogs();
 
-//         // Check that the Duel contract has the correct values
-//         assertEq(duel.title(), title);
-//         assertEq(duel.playerA(), playerA);
-//         assertEq(duel.playerB(), playerB);
-//         assertEq(duel.duelWallet(), duelWallet);
-//         assertEq(duel.factory(), address(duelFactory));
-//         assertEq(duel.judge(), judge);
+        // Find the DuelCreated event
+        bytes32 eventSignature = keccak256("DuelCreated(uint256,address)");
+        address duelAddress;
 
-//         // Verify DuelSide contracts
-//         address optionAAddress = duel.optionA();
-//         address optionBAddress = duel.optionB();
+        for (uint256 i = 0; i < entries.length; i++) {
+            if (entries[i].topics[0] == eventSignature) {
+                duelAddress = address(uint160(uint256(entries[i].topics[2])));
+                break;
+            }
+        }
 
-//         assertTrue(optionAAddress != address(0), "Option A not set");
-//         assertTrue(optionBAddress != address(0), "Option B not set");
+        require(duelAddress != address(0), "Duel contract not deployed");
 
-//         // Check that the funds were sent to DuelSide A
-//         uint256 balanceOptionA = optionAAddress.balance;
-//         assertEq(balanceOptionA, amount, "Funds not sent to Option A");
+        // Interact with the Duel contract
+        Duel duel = Duel(duelAddress);
 
-//         vm.stopPrank();
-//     }
-// }
+        // Check that the Duel contract has the correct values
+        assertEq(duel.title(), title);
+        assertEq(duel.playerA(), playerA);
+        assertEq(duel.playerB(), playerB);
+        assertEq(duel.duelWallet(), duelWallet);
+        assertEq(duel.factory(), address(duelFactory));
+        assertEq(duel.judge(), judge);
+
+        // Verify DuelSide contracts
+        address optionAAddress = duel.optionA();
+        address optionBAddress = duel.optionB();
+
+        assertTrue(optionAAddress != address(0), "Option A not set");
+        assertTrue(optionBAddress != address(0), "Option B not set");
+
+        // Check that the funds were sent to DuelSide A
+        uint256 balanceOptionA = optionAAddress.balance;
+        assertEq(balanceOptionA, amount, "Funds not sent to Option A");
+
+        vm.stopPrank();
+    }
+}

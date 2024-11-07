@@ -17,7 +17,6 @@ error DuelFactory__InvalidPlayerB();
 error DuelFactory__InvalidFee();
 
 contract DuelFactory is Ownable, Pausable {
-    
     uint256 private _nextDuelId;
     uint256 public duelFee; // Percentage. E.g. 'duelFee = 1' -> 1%
     uint256 public fundingTimeLimit;
@@ -70,18 +69,16 @@ contract DuelFactory is Ownable, Pausable {
             duelImplementation,
             abi.encodeWithSignature(
                 "initialize(uint256,address,address,string,address,address,address,uint256,uint256,address)",
-                abi.encodePacked(
-                    duelId,
-                    address(this),
-                    duelWallet,
-                    _title, // duel's title
-                    _payoutA, // payout wallet for option A
-                    msg.sender, // player A
-                    _playerB,
-                    _fundingTime, // funding time limit
-                    _decidingTime, // deciding time limit
-                    _judge // judge address
-                )
+                duelId,
+                address(this),
+                duelWallet,
+                _title, // duel's title
+                _payoutA, // payout wallet for option A
+                msg.sender, // player A
+                _playerB,
+                _fundingTime, // funding time limit
+                _decidingTime, // deciding time limit
+                _judge // judge address
             )
         );
 
@@ -104,7 +101,7 @@ contract DuelFactory is Ownable, Pausable {
             address(duelSideA),
             address(duelSideB)
         );
-
+        
         emit DuelCreated(duelId, address(proxy));
     }
 
