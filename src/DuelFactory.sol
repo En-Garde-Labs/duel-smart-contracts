@@ -39,7 +39,7 @@ contract DuelFactory is Ownable, Pausable {
         uint256 _fundingTimeLimit,
         uint256 _decidingTimeLimit
     ) Ownable(msg.sender) {
-        if (_duelFee > 100) revert DuelFactory__InvalidFee();
+        if (_duelFee > 10000) revert DuelFactory__InvalidFee(); // Max 100% in basis points
         duelImplementation = _duelImplementation;
         duelWallet = _duelWallet;
         duelFee = _duelFee;
@@ -121,17 +121,19 @@ contract DuelFactory is Ownable, Pausable {
     }
 
     function setFee(uint256 _newFee) public onlyOwner {
-        if (_newFee > 100) revert DuelFactory__InvalidFee();
+        if (_newFee > 10000) revert DuelFactory__InvalidFee(); // Max 100% in basis points
         duelFee = _newFee;
         emit NewFee(_newFee);
     }
 
     function setFundingTimeLimit(uint256 _newLimit) public onlyOwner {
+        // TBD set limits
         fundingTimeLimit = _newLimit;
         emit NewFundingTimeLimit(_newLimit);
     }
 
     function setDecidingTimeLimit(uint256 _newLimit) public onlyOwner {
+        // TBD set limits
         decidingTimeLimit = _newLimit;
         emit NewDecidingTimeLimit(_newLimit);
     }

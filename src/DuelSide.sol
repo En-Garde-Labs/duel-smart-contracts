@@ -14,7 +14,7 @@ contract DuelSide {
     uint256 public amount;
     uint256 public creationTime;
     uint256 public fundingTime;
-    uint256 public duelFee; // An integer between 0 and 100
+    uint256 public duelFee; // Fee in basis points. E.g., 'duelFee = 125' -> 1.25%
     address public duelAddress;
 
     mapping(address user => uint256 balance) public balances;
@@ -46,9 +46,9 @@ contract DuelSide {
     function sendPayout(
         address payable _payoutAddress,
         address _duelWallet
-    ) public {
+    ) external {
         if (msg.sender != duelAddress) revert DuelSide__Unauthorized();
-        uint256 _duelFee = (address(this).balance * (duelFee * 100)) / 10000;
+        uint256 _duelFee = (address(this).balance * duelFee) / 10000;
         uint256 _payoutAmount = address(this).balance - _duelFee;
         (bool payoutSuccess, ) = _payoutAddress.call{value: _payoutAmount}("");
         (bool feeSuccess, ) = payable(_duelWallet).call{value: _duelFee}("");
