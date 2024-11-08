@@ -91,8 +91,8 @@ contract DuelFactory is Ownable, Pausable {
         );
         DuelSide duelSideB = new DuelSide(
             address(proxy),
-            block.timestamp,
             _amount,
+            block.timestamp,
             _fundingTime,
             duelFee
         );
