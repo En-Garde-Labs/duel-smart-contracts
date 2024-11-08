@@ -40,6 +40,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     address public duelWallet;
     bool public judgeAccepted;
     bool public playerBAccepted;
+    bool public decisionMade;
     address public optionA;
     address public optionB;
     address public payoutA;
@@ -61,8 +62,10 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         address indexed player,
         address indexed payoutAddress
     );
+    event DuelActivated();
     event DuelCompleted(address indexed winner);
     event DuelExpired();
+    event PayoutSent();
 
     modifier onlyDuringFundingTime() {
         if (block.timestamp > creationTime + fundingTime)
@@ -82,7 +85,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         updateStatus();
         _;
     }
-   
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -102,7 +105,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     ) public initializer {
         __Ownable_init(_playerA);
         __UUPSUpgradeable_init();
-        if (judge == address(0)) {
+        if (_judge == address(0)) {
             judgeAccepted = true;
         }
         duelId = _duelId;
@@ -134,7 +137,8 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     function playerBAccept(
         address _payoutB
     ) public payable onlyDuringFundingTime updatesStatus {
-        if (playerBAccepted) revert DuelImplementation__AlreadyAccepted(playerB);
+        if (playerBAccepted)
+            revert DuelImplementation__AlreadyAccepted(playerB);
         if (msg.sender != playerB) revert DuelImplementation__OnlyPlayerB();
         if (msg.value == 0) revert DuelImplementation__InvalidETHValue();
 
@@ -159,9 +163,11 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         if (_winner != optionA && _winner != optionB)
             revert DuelImplementation__InvalidWinner();
 
-        status = Status.COMPLETED;
+        decisionMade = true;
+        updateStatus();
 
         _distributePayout(_winner);
+        emit DuelCompleted(_winner);
     }
 
     function playersAgree(address _winner) public updatesStatus {
@@ -178,8 +184,10 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
             require(agreedWinner == _winner, "Players disagree on winner");
             playerAgreed[msg.sender] = true;
             if (playerAgreed[playerA] && playerAgreed[playerB]) {
-                status = Status.COMPLETED;
+                decisionMade = true;
+                updateStatus();
                 _distributePayout(_winner);
+                emit DuelCompleted(_winner);
             }
         }
     }
@@ -206,13 +214,25 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     function updateStatus() public {
         if (status == Status.DRAFT) {
             if (block.timestamp > creationTime + fundingTime) {
-                status = Status.EXPIRED;
-                emit DuelExpired();
+                if (!judgeAccepted || !playerBAccepted) {
+                    status = Status.EXPIRED;
+                    emit DuelExpired();
+                } else {
+                    status = Status.ACTIVE;
+                    emit DuelActivated();
+                }
+            } else if (judgeAccepted && playerBAccepted) {
+                status = Status.ACTIVE;
+                emit DuelActivated();
             }
         } else if (status == Status.ACTIVE) {
             if (block.timestamp > creationTime + fundingTime + decidingTime) {
-                status = Status.EXPIRED;
-                emit DuelExpired();
+                if (!decisionMade) {
+                    status = Status.EXPIRED;
+                    emit DuelExpired();
+                }
+            } else if (decisionMade) {
+                status = Status.COMPLETED;
             }
         }
     }
@@ -243,6 +263,6 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         if (!sentPayoutA || !sentPayoutB)
             revert DuelImplementation__PayoutFailed();
 
-        emit DuelCompleted(_winner);
+        emit PayoutSent();
     }
 }

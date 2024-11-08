@@ -45,6 +45,8 @@ contract DuelTest is Test {
     DuelFactory duelFactory;
     Duel duelImplementation;
     Duel duel;
+    Duel duelWithJudge;
+    Duel duelNoJudge;
     address duelImplementationAddress;
     address duelWallet = 0x7611A60c2346f3D193f65B051eD6Ae93239FF25e;
 
@@ -217,32 +219,32 @@ contract DuelTest is Test {
         vm.stopPrank();
 
         // Check that the duel status is ACTIVE
-        assertEq(duel.getStatus(), uint8(IDuel.Status.ACTIVE));
+        assertEq(duelWithJudge.getStatus(), uint8(IDuel.Status.ACTIVE));
     }
 
-    // function testJudgeDecide() public {
-    //     // Players and judge accept to activate the duel
-    //     testDuelBecomesActiveAfterAcceptance();
+    function testJudgeDecide() public {
+        // Players and judge accept to activate the duel
+        testDuelBecomesActiveAfterAcceptance();
 
-    //     // Warp to deciding time
-    //     uint256 creationTime = duel.creationTime();
-    //     uint256 fundingTimeValue = duel.fundingTime();
+        // Warp to deciding time
+        uint256 creationTime = duel.creationTime();
+        uint256 fundingTimeValue = duel.fundingTime();
 
-    //     vm.warp(creationTime + fundingTimeValue + 1);
+        vm.warp(creationTime + fundingTimeValue + 1);
 
-    //     // Start impersonating judge
-    //     vm.startPrank(judge);
+        // Start impersonating judge
+        vm.startPrank(judge);
 
-    //     // Judge decides the winner (Option A)
-    //     vm.expectEmit(true, false, false, false);
-    //     emit DuelCompleted(duel.optionA());
-    //     duel.judgeDecide(duel.optionA());
+        // Judge decides the winner (Option A)
+        vm.expectEmit(true, false, false, false);
+        emit DuelCompleted(duel.optionA());
+        duel.judgeDecide(duel.optionA());
 
-    //     // Check that status is COMPLETED
-    //     assertEq(duel.getStatus(), uint8(IDuel.Status.COMPLETED));
+        // Check that status is COMPLETED
+        assertEq(duel.getStatus(), uint8(IDuel.Status.COMPLETED));
 
-    //     vm.stopPrank();
-    // }
+        vm.stopPrank();
+    }
 
     // function testPlayersAgree() public {
     //     // Deploy a new Duel instance with no judge
