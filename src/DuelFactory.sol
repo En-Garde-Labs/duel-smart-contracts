@@ -60,11 +60,12 @@ contract DuelFactory is Ownable, Pausable {
         ERC1967Proxy proxy = new ERC1967Proxy(
             duelImplementation,
             abi.encodeWithSignature(
-                "initialize(uint256,address,address,string,address,address,address,uint256,uint256,address)",
+                "initialize(uint256,address,address,string,uint256,address,address,address,uint256,uint256,address)",
                 duelId,
                 address(this),
                 duelWallet,
                 _title, // duel's title
+                _amount, // amount of the duel
                 _payoutA, // payout wallet for option A
                 msg.sender, // player A
                 _playerB,

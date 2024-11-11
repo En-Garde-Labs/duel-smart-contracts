@@ -19,8 +19,6 @@ error DuelImplementation__DuelExpired();
 error DuelImplementation__Unauthorized();
 error DuelImplementation__JudgeExists();
 
-import {console} from "forge-std/console.sol";
-
 interface IDuel {
     function setOptionsAddresses(address _optionA, address _optionB) external;
 
@@ -30,8 +28,8 @@ interface IDuel {
 }
 
 contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
-    address public factory;
     uint256 public duelId;
+    address public factory;
     address public duelWallet;
     bool public judgeAccepted;
     bool public playerBAccepted;
@@ -42,6 +40,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     address public playerB;
     address public judge;
     address public agreedWinner;
+    uint256 public amount;
     uint256 public creationTime;
     uint256 public fundingDuration;
     uint256 public decisionLockDuration;
@@ -96,6 +95,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         address _factory,
         address _duelWallet,
         string memory _title,
+        uint256 _amount,
         address _payoutA,
         address _playerA,
         address _playerB,
@@ -112,6 +112,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         factory = _factory;
         duelWallet = _duelWallet;
         title = _title;
+        amount = _amount;
         payoutAddresses[_playerA] = _payoutA;
         playerA = _playerA;
         playerB = _playerB;
@@ -227,7 +228,12 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     function updateStatus() public {
         // Check if funding time has ended without acceptance
         if (block.timestamp > creationTime + fundingDuration) {
-            if (!judgeAccepted || !playerBAccepted) {
+            if (
+                !judgeAccepted ||
+                !playerBAccepted ||
+                optionA.balance < amount ||
+                optionB.balance < amount
+            ) {
                 duelExpiredOrFinished = true;
                 emit DuelExpired();
                 return; // Early exit since duel has expired
@@ -238,12 +244,10 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         uint256 decisionStartTime = creationTime + decisionLockDuration;
         uint256 decisionEndTime = decisionStartTime + fundingDuration; // decisionDuration equals fundingDuration
 
-        // Check if decision period has ended without a decision
+        // Check if decision period has ended
         if (block.timestamp > decisionEndTime) {
-            if (!decisionMade) {
-                duelExpiredOrFinished = true;
-                emit DuelExpired();
-            }
+            duelExpiredOrFinished = true;
+            emit DuelExpired();
         }
     }
 
