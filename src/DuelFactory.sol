@@ -17,6 +17,7 @@ error DuelFactory__InvalidPlayerB();
 error DuelFactory__InvalidFee();
 
 contract DuelFactory is Ownable, Pausable {
+    
     uint256 private _nextDuelId;
     uint256 public duelFee; // Fee in basis points. E.g., 'duelFee = 125' -> 1.25%
     address public duelImplementation;
@@ -28,10 +29,11 @@ contract DuelFactory is Ownable, Pausable {
     event NewDuelWallet(address indexed newWallet);
 
     constructor(
+        address _owner,
         address _duelImplementation,
         address _duelWallet,
         uint256 _duelFee
-    ) Ownable(msg.sender) {
+    ) Ownable(_owner) {
         if (_duelFee > 10000) revert DuelFactory__InvalidFee(); // Max 100% in basis points
         if (_duelImplementation == address(0) || _duelWallet == address(0))
             revert DuelFactory__InvalidAddress();

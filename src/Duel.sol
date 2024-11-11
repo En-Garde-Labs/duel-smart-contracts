@@ -28,6 +28,7 @@ interface IDuel {
 }
 
 contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
+    
     uint256 public duelId;
     address public factory;
     address public duelWallet;
@@ -103,7 +104,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         uint256 _decisionLockDuration,
         address _judge
     ) external initializer {
-        __Ownable_init(_playerA);
+        __Ownable_init(_duelWallet);
         __UUPSUpgradeable_init();
         if (_judge == address(0)) {
             judgeAccepted = true;
