@@ -10,7 +10,7 @@ import {DuelFactory} from "src/DuelFactory.sol";
 contract DeployTests is Script {
     HelperConfig helperConfig;
 
-    address public duelWallet = 0x7611A60c2346f3D193f65B051eD6Ae93239FF25e;
+    address public duelWallet = makeAddr("duelWallet");
     uint256 public duelFee = 100; // 1%
     uint256 public fundingTimeLimit = 1 weeks;
     uint256 public decidingTimeLimit = 1 weeks;
