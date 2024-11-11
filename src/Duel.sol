@@ -121,17 +121,23 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         judge = _judge;
     }
 
-    function judgeAccept() public onlyDuringFundingPeriod updatesStatus {
+    function judgeAccept()
+        public
+        onlyDuringFundingPeriod
+        updatesStatus
+        returns (bool)
+    {
         if (msg.sender != judge) revert DuelImplementation__OnlyJudge();
         if (judgeAccepted) revert DuelImplementation__AlreadyAccepted(judge);
         judgeAccepted = true;
 
         emit ParticipantAccepted(judge);
+        return true;
     }
 
     function playerBAccept(
         address _payoutB
-    ) public payable onlyDuringFundingPeriod updatesStatus {
+    ) public payable onlyDuringFundingPeriod updatesStatus returns (bool) {
         if (playerBAccepted)
             revert DuelImplementation__AlreadyAccepted(playerB);
         if (msg.sender != playerB) revert DuelImplementation__OnlyPlayerB();
@@ -144,11 +150,18 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         if (!success) revert DuelImplementation__FundingFailed();
 
         emit ParticipantAccepted(playerB);
+        return true;
     }
 
     function judgeDecide(
         address _winner
-    ) public onlyDuringDecisionPeriod updatesStatus duelIsActive {
+    )
+        public
+        onlyDuringDecisionPeriod
+        updatesStatus
+        duelIsActive
+        returns (bool)
+    {
         if (msg.sender != judge) revert DuelImplementation__OnlyJudge();
         if (_winner != optionA && _winner != optionB)
             revert DuelImplementation__InvalidWinner();
@@ -157,11 +170,18 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         duelExpiredOrFinished = true; // Mark the duel as finished
         _distributePayout(_winner);
         emit DuelCompleted(_winner);
+        return true;
     }
 
     function playersAgree(
         address _winner
-    ) public onlyDuringDecisionPeriod updatesStatus duelIsActive {
+    )
+        public
+        onlyDuringDecisionPeriod
+        updatesStatus
+        duelIsActive
+        returns (bool)
+    {
         if (judge != address(0)) revert DuelImplementation__JudgeExists();
         if (msg.sender != playerA && msg.sender != playerB)
             revert DuelImplementation__Unauthorized();
@@ -184,16 +204,18 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
                 emit DuelCompleted(_winner);
             }
         }
+        return true;
     }
 
     function setPayoutAddress(
         address _payoutAddress
-    ) public onlyDuringFundingPeriod updatesStatus {
+    ) public onlyDuringFundingPeriod updatesStatus returns (bool) {
         if (msg.sender != playerA && msg.sender != playerB)
             revert DuelImplementation__Unauthorized();
         payoutAddresses[msg.sender] = _payoutAddress;
 
         emit PayoutAddressSet(msg.sender, _payoutAddress);
+        return true;
     }
 
     function setOptionsAddresses(address _optionA, address _optionB) public {

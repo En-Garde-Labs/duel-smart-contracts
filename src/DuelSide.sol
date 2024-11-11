@@ -46,7 +46,7 @@ contract DuelSide {
     function sendPayout(
         address payable _payoutAddress,
         address _duelWallet
-    ) external {
+    ) external returns (bool) {
         if (msg.sender != duelAddress) revert DuelSide__Unauthorized();
         uint256 _duelFee = (address(this).balance * duelFee) / 10000;
         uint256 _payoutAmount = address(this).balance - _duelFee;
@@ -54,6 +54,7 @@ contract DuelSide {
         (bool feeSuccess, ) = payable(_duelWallet).call{value: _duelFee}("");
         if (!payoutSuccess || !feeSuccess) revert DuelSide__PayoutFailed();
         emit PayoutSent(_payoutAddress, address(this).balance);
+        return true;
     }
 
     function claimFunds() public {
@@ -65,7 +66,7 @@ contract DuelSide {
             revert DuelSide__DuelNotExpired();
         }
         uint256 _amount = balances[msg.sender];
-        if(_amount == 0) revert DuelSide__BalanceIsZero();
+        if (_amount == 0) revert DuelSide__BalanceIsZero();
         balances[msg.sender] = 0;
         (bool success, ) = msg.sender.call{value: _amount}("");
         if (!success) revert DuelSide__PayoutFailed();

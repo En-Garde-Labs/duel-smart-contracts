@@ -24,7 +24,7 @@ contract DuelFactory is Ownable, Pausable {
     event NewImplementation(address indexed newImplementation);
     event DuelCreated(uint256 indexed tokenId, address indexed duel);
     event NewFee(uint256 indexed newFee);
-    event NewDuelWallet(address newWallet);
+    event NewDuelWallet(address indexed newWallet);
 
     constructor(
         address _duelImplementation,
