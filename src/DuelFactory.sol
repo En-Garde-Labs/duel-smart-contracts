@@ -46,7 +46,7 @@ contract DuelFactory is Ownable, Pausable {
         uint256 _fundingDuration,
         uint256 _decisionLockDuration,
         address _judge
-    ) public payable whenNotPaused returns (address) {
+    ) external payable whenNotPaused returns (address) {
         // check a min/max duration for fundingDuration?
         // check a min/max duration for decisionLockDuration?
         if (_playerB == msg.sender || _playerB == address(0))
@@ -99,29 +99,29 @@ contract DuelFactory is Ownable, Pausable {
         return address(proxy);
     }
 
-    function setImplementation(address _newImplementation) public onlyOwner {
+    function setImplementation(address _newImplementation) external onlyOwner {
         if (_newImplementation.code.length == 0)
             revert DuelFactory__InvalidImplementation();
         duelImplementation = _newImplementation;
         emit NewImplementation(_newImplementation);
     }
 
-    function setDuelWallet(address _newWallet) public onlyOwner {
+    function setDuelWallet(address _newWallet) external onlyOwner {
         duelWallet = _newWallet;
         emit NewDuelWallet(_newWallet);
     }
 
-    function setFee(uint256 _newFee) public onlyOwner {
+    function setFee(uint256 _newFee) external onlyOwner {
         if (_newFee > 10000) revert DuelFactory__InvalidFee(); // Max 100% in basis points
         duelFee = _newFee;
         emit NewFee(_newFee);
     }
 
-    function pause() public onlyOwner whenNotPaused {
+    function pause() external onlyOwner whenNotPaused {
         _pause();
     }
 
-    function unpause() public onlyOwner whenPaused {
+    function unpause() external onlyOwner whenPaused {
         _unpause();
     }
 }

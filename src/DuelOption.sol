@@ -61,7 +61,7 @@ contract DuelOption {
         return true;
     }
 
-    function claimFunds() public {
+    function claimFunds() external {
         // Request status update from Duel contract
         IDuel duel = IDuel(duelAddress);
         duel.updateStatus();

@@ -102,7 +102,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         uint256 _fundingDuration,
         uint256 _decisionLockDuration,
         address _judge
-    ) public initializer {
+    ) external initializer {
         __Ownable_init(_playerA);
         __UUPSUpgradeable_init();
         if (_judge == address(0)) {
@@ -123,7 +123,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     }
 
     function judgeAccept()
-        public
+        external
         onlyDuringFundingPeriod
         updatesStatus
         returns (bool)
@@ -138,7 +138,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
 
     function playerBAccept(
         address _payoutB
-    ) public payable onlyDuringFundingPeriod updatesStatus returns (bool) {
+    ) external payable onlyDuringFundingPeriod updatesStatus returns (bool) {
         if (playerBAccepted)
             revert DuelImplementation__AlreadyAccepted(playerB);
         if (msg.sender != playerB) revert DuelImplementation__OnlyPlayerB();
@@ -157,7 +157,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     function judgeDecide(
         address _winner
     )
-        public
+        external
         onlyDuringDecisionPeriod
         updatesStatus
         duelIsActive
@@ -177,7 +177,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     function playersAgree(
         address _winner
     )
-        public
+        external
         onlyDuringDecisionPeriod
         updatesStatus
         duelIsActive
@@ -210,7 +210,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
 
     function setPayoutAddress(
         address _payoutAddress
-    ) public onlyDuringFundingPeriod updatesStatus returns (bool) {
+    ) external onlyDuringFundingPeriod updatesStatus returns (bool) {
         if (msg.sender != playerA && msg.sender != playerB)
             revert DuelImplementation__Unauthorized();
         payoutAddresses[msg.sender] = _payoutAddress;
@@ -219,7 +219,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         return true;
     }
 
-    function setOptionsAddresses(address _optionA, address _optionB) public {
+    function setOptionsAddresses(address _optionA, address _optionB) external {
         if (msg.sender != factory) revert DuelImplementation__OnlyFactory();
         optionA = _optionA;
         optionB = _optionB;
@@ -251,7 +251,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         }
     }
 
-    function _distributePayout(address _winner) internal {
+    function _distributePayout(address _winner) private {
         address winningPlayer;
         if (_winner == optionA) {
             winningPlayer = playerA;
