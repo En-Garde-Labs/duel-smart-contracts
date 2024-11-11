@@ -25,13 +25,12 @@ contract DuelSide {
     constructor(
         address _duelAddress,
         uint256 _amount,
-        uint256 _creationTime,
         uint256 _fundingTime,
         uint256 _duelFee
     ) payable {
         duelAddress = _duelAddress;
         amount = _amount;
-        creationTime = _creationTime;
+        creationTime = block.timestamp;
         fundingTime = _fundingTime;
         duelFee = _duelFee;
     }
@@ -61,8 +60,7 @@ contract DuelSide {
         IDuel duel = IDuel(duelAddress);
         duel.updateStatus();
 
-        IDuel.Status duelStatus = IDuel.Status(duel.getStatus());
-        if (duelStatus != IDuel.Status.EXPIRED) {
+        if (!duel.duelExpiredOrFinished()) {
             revert DuelSide__DuelNotExpired();
         }
         uint256 _amount = balances[msg.sender];

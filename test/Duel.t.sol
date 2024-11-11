@@ -71,42 +71,57 @@ contract DuelTest is Test {
 
         duelImplementationAddress = address(duelImplementation);
 
-        // Deploy a new Duel instance via proxy
-        bytes memory data = abi.encodeWithSignature(
-            "initialize(uint256,address,address,string,address,address,address,uint256,uint256,address)",
-            1, // duelId
-            address(duelFactory), // factory
-            duelWallet, // duelWallet
-            "Test Duel", // title
-            playerA, // payoutA
-            playerA, // playerA
-            playerB, // playerB
-            fundingTime, // fundingTime
-            decidingTime, // decidingTime
-            judge // judge
-        );
-        ERC1967Proxy proxy = new ERC1967Proxy(duelImplementationAddress, data);
-        duel = Duel(address(proxy));
+        duelWithJudge = Duel(createDuelWithJudge(playerA));
+        duelNoJudge = Duel(createDuelNoJudge(playerA));
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        // // Deploy a new Duel instance via proxy
+        // bytes memory data = abi.encodeWithSignature(
+        //     "initialize(uint256,address,address,string,address,address,address,uint256,uint256,address)",
+        //     1, // duelId
+        //     address(duelFactory), // factory
+        //     duelWallet, // duelWallet
+        //     "Test Duel", // title
+        //     playerA, // payoutA
+        //     playerA, // playerA
+        //     playerB, // playerB
+        //     fundingTime, // fundingTime
+        //     decidingTime, // decidingTime
+        //     judge // judge
+        // );
+        // ERC1967Proxy proxy = new ERC1967Proxy(duelImplementationAddress, data);
+        // duel = Duel(address(proxy));
 
-        // Deploy DuelSide contracts for options A and B
-        DuelSide duelSideA = new DuelSide(
-            address(duel),
-            1 ether, // amount
-            block.timestamp,
-            fundingTime,
-            duelFee
-        );
-        DuelSide duelSideB = new DuelSide(
-            address(duel),
-            1 ether, // amount
-            block.timestamp,
-            fundingTime,
-            duelFee
-        );
+        // // Deploy DuelSide contracts for options A and B
+        // DuelSide duelSideA = new DuelSide(
+        //     address(duel),
+        //     1 ether, // amount
+        //     block.timestamp,
+        //     fundingTime,
+        //     duelFee
+        // );
+        // DuelSide duelSideB = new DuelSide(
+        //     address(duel),
+        //     1 ether, // amount
+        //     block.timestamp,
+        //     fundingTime,
+        //     duelFee
+        // );
 
-        // Set options addresses
-        vm.prank(address(duelFactory));
-        duel.setOptionsAddresses(address(duelSideA), address(duelSideB));
+        // // Set options addresses
+        // vm.prank(address(duelFactory));
+        // duel.setOptionsAddresses(address(duelSideA), address(duelSideB));
     }
 
     function createDuelWithJudge(address player) public returns(address) {
@@ -115,7 +130,7 @@ contract DuelTest is Test {
         vm.startPrank(player);
 
         // Player creates a duel
-        address duelWithJudge = duelFactory.createDuel{value: 1 ether}(
+        address duelWithJudgeAddr = duelFactory.createDuel{value: 1 ether}(
             "Test Duel",
             playerA,
             playerB,
@@ -126,7 +141,7 @@ contract DuelTest is Test {
         );
         vm.stopPrank();
 
-        return duelWithJudge;
+        return duelWithJudgeAddr;
     }
 
     function createDuelNoJudge(address player) public returns(address) {
@@ -134,7 +149,7 @@ contract DuelTest is Test {
         vm.deal(player, 1 ether);
 
         // Player creates a duel
-        address duelNoJudge = duelFactory.createDuel{value: 1 ether}(
+        address duelNoJudgeAddr = duelFactory.createDuel{value: 1 ether}(
             "Test Duel",
             playerA,
             playerB,
@@ -144,7 +159,7 @@ contract DuelTest is Test {
             address(0)
         );
 
-        return duelNoJudge;
+        return duelNoJudgeAddr;
     }
 
     function testPlayerASetPayoutAddress() public {
@@ -152,10 +167,10 @@ contract DuelTest is Test {
         vm.startPrank(playerA);
 
         // Player A sets payout address
-        duel.setPayoutAddress(playerA);
+        duelWithJudge.setPayoutAddress(playerA);
 
         // Check that payoutA is set correctly
-        assertEq(duel.payoutA(), playerA);
+        assertEq(duelWithJudge.payoutAddresses(playerA), playerA);
 
         vm.stopPrank();
     }
@@ -168,16 +183,16 @@ contract DuelTest is Test {
         vm.deal(playerB, 1 ether);
 
         // Player B sets payout address
-        duel.setPayoutAddress(playerB);
-        assertEq(duel.payoutB(), playerB);
+        duelWithJudge.setPayoutAddress(playerB);
+        assertEq(duelWithJudge.payoutAddresses(playerB), playerB);
 
         // Player B accepts the duel
         vm.expectEmit(true, false, false, false);
         emit ParticipantAccepted(playerB);
-        duel.playerBAccept{value: 1 ether}(playerB);
+        duelWithJudge.playerBAccept{value: 1 ether}(playerB);
 
         // Check that playerBAccepted is true
-        assertTrue(duel.playerBAccepted());
+        assertTrue(duelWithJudge.playerBAccepted());
 
         vm.stopPrank();
     }
@@ -189,10 +204,10 @@ contract DuelTest is Test {
     //     // Judge accepts the duel
     //     vm.expectEmit(true, false, false, false);
     //     emit ParticipantAccepted(judge);
-    //     duel.judgeAccept();
+    //     duelWithJudge.judgeAccept();
 
     //     // Check that judgeAccepted is true
-    //     assertTrue(duel.judgeAccepted());
+    //     assertTrue(duelWithJudge.judgeAccepted());
 
     //     vm.stopPrank();
     // }
@@ -200,7 +215,7 @@ contract DuelTest is Test {
     function testDuelBecomesActiveAfterAcceptance() public {
         
         address duelWithJudgeAddr = createDuelWithJudge(playerA);
-        Duel duelWithJudge = Duel(duelWithJudgeAddr);
+        duelWithJudge = Duel(duelWithJudgeAddr);
         
         // Player A sets payout address
         vm.startPrank(playerA);
@@ -227,8 +242,8 @@ contract DuelTest is Test {
         testDuelBecomesActiveAfterAcceptance();
 
         // Warp to deciding time
-        uint256 creationTime = duel.creationTime();
-        uint256 fundingTimeValue = duel.fundingTime();
+        uint256 creationTime = duelWithJudge.creationTime();
+        uint256 fundingTimeValue = duelWithJudge.fundingDuration();
 
         vm.warp(creationTime + fundingTimeValue + 1);
 
@@ -237,11 +252,11 @@ contract DuelTest is Test {
 
         // Judge decides the winner (Option A)
         vm.expectEmit(true, false, false, false);
-        emit DuelCompleted(duel.optionA());
-        duel.judgeDecide(duel.optionA());
+        emit DuelCompleted(duelWithJudge.optionA());
+        duelWithJudge.judgeDecide(duelWithJudge.optionA());
 
         // Check that status is COMPLETED
-        assertEq(duel.getStatus(), uint8(IDuel.Status.COMPLETED));
+        assertEq(duelWithJudge.getStatus(), uint8(IDuel.Status.COMPLETED));
 
         vm.stopPrank();
     }
@@ -323,15 +338,15 @@ contract DuelTest is Test {
 
     function testUpdateStatusToExpired() public {
         // Warp to after funding time
-        uint256 creationTime = duel.creationTime();
-        uint256 fundingTimeValue = duel.fundingTime();
+        uint256 creationTime = duelWithJudge.creationTime();
+        uint256 fundingTimeValue = duelWithJudge.fundingDuration();
 
         vm.warp(creationTime + fundingTimeValue + 1);
 
         // Update status
-        duel.updateStatus();
+        duelWithJudge.updateStatus();
 
         // Check that status is EXPIRED
-        assertEq(duel.getStatus(), uint8(IDuel.Status.EXPIRED));
+        assertEq(duelWithJudge.getStatus(), uint8(IDuel.Status.EXPIRED));
     }
 }

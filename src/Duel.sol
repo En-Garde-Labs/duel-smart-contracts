@@ -8,30 +8,24 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 error DuelImplementation__OnlyFactory();
 error DuelImplementation__OnlyJudge();
 error DuelImplementation__OnlyPlayerB();
-error DuelImplementation__FundingTimeExceeded();
+error DuelImplementation__FundingDurationExceeded();
 error DuelImplementation__AlreadyAccepted(address);
-error DuelImplementation__NotDecidingTime();
+error DuelImplementation__NotDecisionPeriod();
 error DuelImplementation__InvalidETHValue();
 error DuelImplementation__FundingFailed();
 error DuelImplementation__InvalidWinner();
 error DuelImplementation__PayoutFailed();
 error DuelImplementation__DuelExpired();
-error DuelImplementation__NoJudge();
 error DuelImplementation__Unauthorized();
+
+import {console} from "forge-std/console.sol";
 
 interface IDuel {
     function setOptionsAddresses(address _optionA, address _optionB) external;
 
-    enum Status {
-        DRAFT,
-        ACTIVE,
-        COMPLETED,
-        EXPIRED
-    }
-
     function updateStatus() external;
 
-    function getStatus() external view returns (uint8);
+    function duelExpiredOrFinished() external view returns (bool);
 }
 
 contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
@@ -43,41 +37,46 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     bool public decisionMade;
     address public optionA;
     address public optionB;
-    address public payoutA;
-    address public payoutB;
     address public playerA;
     address public playerB;
     address public judge;
     address public agreedWinner;
     uint256 public creationTime;
-    uint256 public fundingTime;
-    uint256 public decidingTime;
+    uint256 public fundingDuration;
+    uint256 public decisionLockDuration;
     string public title;
-    Status public status;
-    mapping(address => bool) public playerAgreed;
+    bool public duelExpiredOrFinished;
+    mapping(address player => address payoutAddress) public payoutAddresses;
+    mapping(address player => bool) public playerAgreed;
 
-    event NewDuelWallet(address indexed newWallet);
     event ParticipantAccepted(address indexed participant);
     event PayoutAddressSet(
         address indexed player,
         address indexed payoutAddress
     );
-    event DuelActivated();
+
     event DuelCompleted(address indexed winner);
     event DuelExpired();
     event PayoutSent();
 
-    modifier onlyDuringFundingTime() {
-        if (block.timestamp > creationTime + fundingTime)
-            revert DuelImplementation__FundingTimeExceeded();
+    modifier onlyDuringFundingPeriod() {
+        if (block.timestamp > creationTime + fundingDuration)
+            revert DuelImplementation__FundingDurationExceeded();
         _;
     }
 
-    modifier onlyDuringDecidingTime() {
+    modifier onlyDuringDecisionPeriod() {
+        uint256 decisionStartTime = creationTime + decisionLockDuration;
+        uint256 decisionEndTime = decisionStartTime + fundingDuration; // decisionDuration equals fundingDuration
         if (
-            block.timestamp < creationTime + fundingTime ||
-            block.timestamp > creationTime + fundingTime + decidingTime
-        ) revert DuelImplementation__NotDecidingTime();
+            block.timestamp < decisionStartTime ||
+            block.timestamp > decisionEndTime
+        ) revert DuelImplementation__NotDecisionPeriod();
+        _;
+    }
+
+    modifier duelIsActive() {
+        if (duelExpiredOrFinished) revert DuelImplementation__DuelExpired();
         _;
     }
 
@@ -99,8 +98,8 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         address _payoutA,
         address _playerA,
         address _playerB,
-        uint256 _fundingTime,
-        uint256 _decidingTime,
+        uint256 _fundingDuration,
+        uint256 _decisionLockDuration,
         address _judge
     ) public initializer {
         __Ownable_init(_playerA);
@@ -112,42 +111,33 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         factory = _factory;
         duelWallet = _duelWallet;
         title = _title;
-        payoutA = _payoutA;
+        payoutAddresses[_playerA] = _payoutA;
         playerA = _playerA;
         playerB = _playerB;
         creationTime = block.timestamp;
-        fundingTime = _fundingTime;
-        decidingTime = _decidingTime;
+        fundingDuration = _fundingDuration;
+        decisionLockDuration = _decisionLockDuration;
         judge = _judge;
     }
 
-    function judgeAccept() public onlyDuringFundingTime updatesStatus {
-        if (judge == address(0)) revert DuelImplementation__NoJudge();
+    function judgeAccept() public onlyDuringFundingPeriod updatesStatus {
         if (msg.sender != judge) revert DuelImplementation__OnlyJudge();
         if (judgeAccepted) revert DuelImplementation__AlreadyAccepted(judge);
         judgeAccepted = true;
-
-        if (playerBAccepted) {
-            status = Status.ACTIVE;
-        }
 
         emit ParticipantAccepted(judge);
     }
 
     function playerBAccept(
         address _payoutB
-    ) public payable onlyDuringFundingTime updatesStatus {
+    ) public payable onlyDuringFundingPeriod updatesStatus {
         if (playerBAccepted)
             revert DuelImplementation__AlreadyAccepted(playerB);
         if (msg.sender != playerB) revert DuelImplementation__OnlyPlayerB();
         if (msg.value == 0) revert DuelImplementation__InvalidETHValue();
 
-        payoutB = _payoutB;
+        payoutAddresses[msg.sender] = _payoutB;
         playerBAccepted = true;
-
-        if (judgeAccepted) {
-            status = Status.ACTIVE;
-        }
 
         (bool success, ) = optionB.call{value: msg.value}("");
         if (!success) revert DuelImplementation__FundingFailed();
@@ -157,24 +147,24 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
 
     function judgeDecide(
         address _winner
-    ) public onlyDuringDecidingTime updatesStatus {
-        if (status != Status.ACTIVE) revert DuelImplementation__DuelExpired();
+    ) public onlyDuringDecisionPeriod updatesStatus duelIsActive {
         if (msg.sender != judge) revert DuelImplementation__OnlyJudge();
         if (_winner != optionA && _winner != optionB)
             revert DuelImplementation__InvalidWinner();
 
         decisionMade = true;
-        updateStatus();
-
+        duelExpiredOrFinished = true; // Mark the duel as finished
         _distributePayout(_winner);
         emit DuelCompleted(_winner);
     }
 
-    function playersAgree(address _winner) public updatesStatus {
+    function playersAgree(
+        address _winner
+    ) public onlyDuringDecisionPeriod updatesStatus duelIsActive {
         require(judge == address(0), "Judge exists");
         require(msg.sender == playerA || msg.sender == playerB, "Not a player");
-        require(_winner == optionA || _winner == optionB, "Invalid winner");
-        require(status == Status.ACTIVE, "Duel not active");
+        if (_winner != optionA && _winner != optionB)
+            revert DuelImplementation__InvalidWinner();
         require(!playerAgreed[msg.sender], "Player already agreed");
 
         if (agreedWinner == address(0)) {
@@ -185,7 +175,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
             playerAgreed[msg.sender] = true;
             if (playerAgreed[playerA] && playerAgreed[playerB]) {
                 decisionMade = true;
-                updateStatus();
+                duelExpiredOrFinished = true; // Mark the duel as finished
                 _distributePayout(_winner);
                 emit DuelCompleted(_winner);
             }
@@ -194,14 +184,11 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
 
     function setPayoutAddress(
         address _payoutAddress
-    ) public onlyDuringFundingTime updatesStatus {
-        if (msg.sender == playerA) {
-            payoutA = _payoutAddress;
-        } else if (msg.sender == playerB) {
-            payoutB = _payoutAddress;
-        } else {
+    ) public onlyDuringFundingPeriod updatesStatus {
+        if (msg.sender != playerA && msg.sender != playerB)
             revert DuelImplementation__Unauthorized();
-        }
+        payoutAddresses[msg.sender] = _payoutAddress;
+
         emit PayoutAddressSet(msg.sender, _payoutAddress);
     }
 
@@ -212,51 +199,50 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     }
 
     function updateStatus() public {
-        if (status == Status.DRAFT) {
-            if (block.timestamp > creationTime + fundingTime) {
-                if (!judgeAccepted || !playerBAccepted) {
-                    status = Status.EXPIRED;
-                    emit DuelExpired();
-                } else {
-                    status = Status.ACTIVE;
-                    emit DuelActivated();
-                }
-            } else if (judgeAccepted && playerBAccepted) {
-                status = Status.ACTIVE;
-                emit DuelActivated();
+        // Check if funding time has ended without acceptance
+        if (block.timestamp > creationTime + fundingDuration) {
+            if (!judgeAccepted || !playerBAccepted) {
+                duelExpiredOrFinished = true;
+                emit DuelExpired();
+                return; // Early exit since duel has expired
             }
-        } else if (status == Status.ACTIVE) {
-            if (block.timestamp > creationTime + fundingTime + decidingTime) {
-                if (!decisionMade) {
-                    status = Status.EXPIRED;
-                    emit DuelExpired();
-                }
-            } else if (decisionMade) {
-                status = Status.COMPLETED;
+        }
+
+        // Calculate decision period start and end times
+        uint256 decisionStartTime = creationTime + decisionLockDuration;
+        uint256 decisionEndTime = decisionStartTime + fundingDuration; // decisionDuration equals fundingDuration
+
+        // Check if decision period has ended without a decision
+        if (block.timestamp > decisionEndTime) {
+            if (!decisionMade) {
+                duelExpiredOrFinished = true;
+                emit DuelExpired();
             }
         }
     }
 
-    function getStatus() public view returns (uint8) {
-        return uint8(status);
-    }
-
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
-
     function _distributePayout(address _winner) internal {
+        address winningPlayer;
+        if (_winner == optionA) {
+            winningPlayer = playerA;
+        } else if (_winner == optionB) {
+            winningPlayer = playerB;
+        } else {
+            revert DuelImplementation__InvalidWinner();
+        }
+        address payoutAddress = payoutAddresses[winningPlayer];
+
         (bool sentPayoutA, ) = optionA.call(
             abi.encodeWithSignature(
                 "sendPayout(address,address)",
-                _winner,
+                payoutAddress,
                 duelWallet
             )
         );
         (bool sentPayoutB, ) = optionB.call(
             abi.encodeWithSignature(
                 "sendPayout(address,address)",
-                _winner,
+                payoutAddress,
                 duelWallet
             )
         );
@@ -265,4 +251,8 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
 
         emit PayoutSent();
     }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }
