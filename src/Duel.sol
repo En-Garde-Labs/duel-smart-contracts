@@ -17,6 +17,7 @@ error DuelImplementation__InvalidWinner();
 error DuelImplementation__PayoutFailed();
 error DuelImplementation__DuelExpired();
 error DuelImplementation__Unauthorized();
+error DuelImplementation__JudgeExists();
 
 import {console} from "forge-std/console.sol";
 
@@ -161,17 +162,20 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     function playersAgree(
         address _winner
     ) public onlyDuringDecisionPeriod updatesStatus duelIsActive {
-        require(judge == address(0), "Judge exists");
-        require(msg.sender == playerA || msg.sender == playerB, "Not a player");
+        if (judge != address(0)) revert DuelImplementation__JudgeExists();
+        if (msg.sender != playerA && msg.sender != playerB)
+            revert DuelImplementation__Unauthorized();
         if (_winner != optionA && _winner != optionB)
             revert DuelImplementation__InvalidWinner();
-        require(!playerAgreed[msg.sender], "Player already agreed");
+        if (playerAgreed[msg.sender])
+            revert DuelImplementation__AlreadyAccepted(msg.sender);
 
         if (agreedWinner == address(0)) {
             agreedWinner = _winner;
             playerAgreed[msg.sender] = true;
         } else {
-            require(agreedWinner == _winner, "Players disagree on winner");
+            if (agreedWinner != _winner)
+                revert DuelImplementation__InvalidWinner();
             playerAgreed[msg.sender] = true;
             if (playerAgreed[playerA] && playerAgreed[playerB]) {
                 decisionMade = true;
