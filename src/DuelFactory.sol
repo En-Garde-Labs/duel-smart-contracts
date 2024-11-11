@@ -8,6 +8,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
+error DuelFactory__InvalidAddress();
 error DuelFactory__InvalidDurations();
 error DuelFactory__InvalidAmount();
 error DuelFactory__InvalidETHValue();
@@ -16,7 +17,6 @@ error DuelFactory__InvalidPlayerB();
 error DuelFactory__InvalidFee();
 
 contract DuelFactory is Ownable, Pausable {
-    
     uint256 private _nextDuelId;
     uint256 public duelFee; // Fee in basis points. E.g., 'duelFee = 125' -> 1.25%
     address public duelImplementation;
@@ -33,6 +33,8 @@ contract DuelFactory is Ownable, Pausable {
         uint256 _duelFee
     ) Ownable(msg.sender) {
         if (_duelFee > 10000) revert DuelFactory__InvalidFee(); // Max 100% in basis points
+        if (_duelImplementation == address(0) || _duelWallet == address(0))
+            revert DuelFactory__InvalidAddress();
         duelImplementation = _duelImplementation;
         duelWallet = _duelWallet;
         duelFee = _duelFee;

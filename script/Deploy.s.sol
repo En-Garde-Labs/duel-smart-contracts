@@ -27,6 +27,7 @@ contract DefenderScript is Script {
         }
 
         Options memory opts;
+        opts.defender.salt = "0x1234";
         opts.defender.useDefenderDeploy = true;
 
         address proxy = Upgrades.deployUUPSProxy(
