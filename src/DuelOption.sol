@@ -27,13 +27,17 @@ contract DuelOption {
         address _duelAddress,
         uint256 _amount,
         uint256 _fundingTime,
-        uint256 _duelFee
+        uint256 _duelFee,
+        address _initialFunder
     ) payable {
         duelAddress = _duelAddress;
         amount = _amount;
         creationTime = block.timestamp;
         fundingTime = _fundingTime;
         duelFee = _duelFee;
+        if (msg.value > 0) {
+            balances[_initialFunder] = msg.value;
+        }
     }
 
     receive() external payable {

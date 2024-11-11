@@ -78,13 +78,15 @@ contract DuelFactory is Ownable, Pausable {
             address(proxy),
             _amount,
             _fundingDuration,
-            duelFee
+            duelFee,
+            msg.sender
         );
         DuelOption DuelOptionB = new DuelOption(
             address(proxy),
             _amount,
             _fundingDuration,
-            duelFee
+            duelFee,
+            address(0) // No initial funder
         );
 
         IDuel(address(proxy)).setOptionsAddresses(
