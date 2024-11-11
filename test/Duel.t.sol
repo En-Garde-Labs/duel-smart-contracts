@@ -6,7 +6,7 @@ import {HelperConfig} from "script/HelperConfig.s.sol";
 import {DeployTests} from "script/DeployTests.s.sol";
 import {DuelFactory} from "../src/DuelFactory.sol";
 import {Duel} from "../src/Duel.sol";
-import {DuelSide} from "../src/DuelSide.sol";
+import {DuelOption} from "../src/DuelOption.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IDuel} from "../src/Duel.sol";
 

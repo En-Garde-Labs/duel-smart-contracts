@@ -7,7 +7,7 @@ import {HelperConfig} from "script/HelperConfig.s.sol";
 import {DeployTests} from "script/DeployTests.s.sol";
 import {DuelFactory} from "src/DuelFactory.sol";
 import {Duel} from "src/Duel.sol";
-import {DuelSide} from "src/DuelSide.sol";
+import {DuelOption} from "src/DuelOption.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DuelFactoryTest is Test {
@@ -274,14 +274,14 @@ contract DuelFactoryTest is Test {
         assertEq(duel.factory(), address(duelFactory));
         assertEq(duel.judge(), judge);
 
-        // Verify DuelSide contracts
+        // Verify DuelOption contracts
         address optionAAddress = duel.optionA();
         address optionBAddress = duel.optionB();
 
         assertTrue(optionAAddress != address(0), "Option A not set");
         assertTrue(optionBAddress != address(0), "Option B not set");
 
-        // Check that the funds were sent to DuelSide A
+        // Check that the funds were sent to DuelOption A
         uint256 balanceOptionA = optionAAddress.balance;
         assertEq(balanceOptionA, amount, "Funds not sent to Option A");
 

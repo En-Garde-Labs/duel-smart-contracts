@@ -3,7 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {IDuel} from "./Duel.sol";
-import {DuelSide} from "./DuelSide.sol";
+import {DuelOption} from "./DuelOption.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
@@ -16,8 +16,9 @@ error DuelFactory__InvalidPlayerB();
 error DuelFactory__InvalidFee();
 
 contract DuelFactory is Ownable, Pausable {
+    
     uint256 private _nextDuelId;
-    uint256 public duelFee; // Percentage. E.g. 'duelFee = 1' -> 1%
+    uint256 public duelFee; // Fee in basis points. E.g., 'duelFee = 125' -> 1.25%
     address public duelImplementation;
     address public duelWallet;
 
@@ -73,13 +74,13 @@ contract DuelFactory is Ownable, Pausable {
             )
         );
 
-        DuelSide duelSideA = new DuelSide{value: msg.value}(
+        DuelOption DuelOptionA = new DuelOption{value: msg.value}(
             address(proxy),
             _amount,
             _fundingDuration,
             duelFee
         );
-        DuelSide duelSideB = new DuelSide(
+        DuelOption DuelOptionB = new DuelOption(
             address(proxy),
             _amount,
             _fundingDuration,
@@ -87,8 +88,8 @@ contract DuelFactory is Ownable, Pausable {
         );
 
         IDuel(address(proxy)).setOptionsAddresses(
-            address(duelSideA),
-            address(duelSideB)
+            address(DuelOptionA),
+            address(DuelOptionB)
         );
 
         emit DuelCreated(duelId, address(proxy));
