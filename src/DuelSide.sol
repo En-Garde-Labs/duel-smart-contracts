@@ -9,6 +9,7 @@ error DuelSide__PayoutFailed();
 error DuelSide__AmountExceeded();
 error DuelSide__FundingTimeEnded();
 error DuelSide__DuelNotExpired();
+error DuelSide__BalanceIsZero();
 
 contract DuelSide {
     uint256 public amount;
@@ -64,7 +65,7 @@ contract DuelSide {
             revert DuelSide__DuelNotExpired();
         }
         uint256 _amount = balances[msg.sender];
-        require(_amount > 0, "No funds to claim");
+        if(_amount == 0) revert DuelSide__BalanceIsZero();
         balances[msg.sender] = 0;
         (bool success, ) = msg.sender.call{value: _amount}("");
         if (!success) revert DuelSide__PayoutFailed();
