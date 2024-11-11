@@ -1,6 +1,9 @@
 # Compiler files
 cache/
 out/
+!out/Duel.sol/
+!out/DuelFactory.sol/
+!out/DuelOption.sol/
 
 # Ignores development broadcast logs
 !/broadcast
