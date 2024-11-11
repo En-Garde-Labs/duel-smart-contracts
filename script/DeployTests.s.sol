@@ -40,9 +40,7 @@ contract DeployTests is Script {
         DuelFactory duelFactory = new DuelFactory(
             _duelImplementation,
             duelWallet,
-            duelFee,
-            fundingTimeLimit,
-            decidingTimeLimit
+            duelFee
         );
         vm.stopBroadcast();
         return duelFactory;
