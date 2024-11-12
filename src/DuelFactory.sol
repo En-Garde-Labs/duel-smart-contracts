@@ -19,8 +19,6 @@ error DuelFactory__InvalidFee();
 contract DuelFactory is Ownable, Pausable {
     uint256 private _nextDuelId;
     uint256 public duelFee; // Fee in basis points. E.g., 'duelFee = 125' -> 1.25%
-    uint256 public fundingDurationLimit;
-    uint256 public decisionLockDurationLimit;
     address public duelImplementation;
     address public duelWallet;
 
