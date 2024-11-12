@@ -12,7 +12,7 @@ contract DeployFactoryScript is Script {
     function run() public {
 
         DefenderOptions memory opts;
-        opts.salt = "0x1234";
+        opts.salt = "0x12345";
         opts.useDefenderDeploy = true;
 
         // Deploy Duel using OpenZeppelin Defender

@@ -38,6 +38,7 @@ contract DeployTests is Script {
 
         vm.startBroadcast(config.account);
         DuelFactory duelFactory = new DuelFactory(
+            config.account,
             _duelImplementation,
             duelWallet,
             duelFee

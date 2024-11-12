@@ -28,7 +28,6 @@ interface IDuel {
 }
 
 contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
-    
     uint256 public duelId;
     address public factory;
     address public duelWallet;
@@ -55,7 +54,6 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         address indexed player,
         address indexed payoutAddress
     );
-
     event DuelCompleted(address indexed winner);
     event DuelExpired();
     event PayoutSent();
@@ -91,6 +89,21 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         _disableInitializers();
     }
 
+    /**
+     * @notice Initializes the `Duel` contract with the required parameters.
+     * @dev This function is called by the `DuelFactory` upon deployment.
+     * @param _duelId Unique identifier for the duel.
+     * @param _factory Address of the factory contract that deployed this duel.
+     * @param _duelWallet Address to which the fee will be sent.
+     * @param _title Title or description of the duel.
+     * @param _amount The target amount of funding for both Option contracts in wei.
+     * @param _payoutA Address for player A's payout wallet.
+     * @param _playerA Address of player A, the creator of the duel.
+     * @param _playerB Address of player B, the participant.
+     * @param _fundingDuration Duration in seconds for the funding period.
+     * @param _decisionLockDuration Duration in seconds for the decision lock period.
+     * @param _judge Address of the judge for the duel (can be zero if no judge).
+     */
     function initialize(
         uint256 _duelId,
         address _factory,
@@ -123,6 +136,11 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         judge = _judge;
     }
 
+    /**
+     * @notice Allows the judge to accept their role in the duel during the funding period.
+     * @dev Only callable by the judge during the funding period, and only once.
+     * @return success Boolean indicating successful acceptance.
+     */
     function judgeAccept()
         external
         onlyDuringFundingPeriod
@@ -137,6 +155,12 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         return true;
     }
 
+    /**
+     * @notice Allows player B to accept the duel and fund their side.
+     * @dev Only callable by player B during the funding period and requires ETH to fund OptionB contract.
+     * @param _payoutB Address for player B's payout wallet.
+     * @return success Boolean indicating successful acceptance.
+     */
     function playerBAccept(
         address _payoutB
     ) external payable onlyDuringFundingPeriod updatesStatus returns (bool) {
@@ -155,6 +179,12 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         return true;
     }
 
+    /**
+     * @notice Allows the judge to decide the winner during the decision period.
+     * @dev Only callable by the judge if a judge is assigned and the decision period is active.
+     * @param _winner Address of the winning option (either optionA or optionB).
+     * @return success Boolean indicating successful decision.
+     */
     function judgeDecide(
         address _winner
     )
@@ -175,6 +205,12 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         return true;
     }
 
+    /**
+     * @notice Allows players A and B to agree on a winner when there is no judge.
+     * @dev Only callable by players A and B during the decision period.
+     * @param _winner Address of the winning option (either optionA or optionB).
+     * @return success Boolean indicating successful agreement.
+     */
     function playersAgree(
         address _winner
     )
@@ -209,6 +245,11 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         return true;
     }
 
+    /**
+     * @notice Sets the payout address for either player A or player B during the funding period.
+     * @param _payoutAddress The address where the payout should be sent for the caller.
+     * @return success Boolean indicating successful update of payout address.
+     */
     function setPayoutAddress(
         address _payoutAddress
     ) external onlyDuringFundingPeriod updatesStatus returns (bool) {
@@ -220,12 +261,22 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         return true;
     }
 
+    /**
+     * @notice Sets the addresses of option A and option B contracts.
+     * @dev This function is only callable by the factory contract when creating the Duel.
+     * @param _optionA Address of the contract representing option A.
+     * @param _optionB Address of the contract representing option B.
+     */
     function setOptionsAddresses(address _optionA, address _optionB) external {
         if (msg.sender != factory) revert DuelImplementation__OnlyFactory();
         optionA = _optionA;
         optionB = _optionB;
     }
 
+    /**
+     * @notice Updates the status of the duel based on funding and decision periods.
+     * @dev This function checks whether the funding or decision period has ended and marks the duel as expired if applicable.
+     */
     function updateStatus() public {
         // Check if funding time has ended without acceptance
         if (block.timestamp > creationTime + fundingDuration) {
@@ -243,7 +294,8 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
 
         // Calculate decision period start and end times
         uint256 decisionStartTime = creationTime + decisionLockDuration;
-        uint256 decisionEndTime = decisionStartTime + fundingDuration; // decisionDuration equals fundingDuration
+        // decisionDuration equals fundingDuration
+        uint256 decisionEndTime = decisionStartTime + fundingDuration;
 
         // Check if decision period has ended
         if (block.timestamp > decisionEndTime) {
@@ -252,6 +304,11 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         }
     }
 
+    /**
+     * @notice Distributes the payout to the winner after a decision is made.
+     * @dev This internal function calls `sendPayout` on both options to send funds to the winner and fee to the duel wallet.
+     * @param _winner Address of the winning option (either optionA or optionB).
+     */
     function _distributePayout(address _winner) private {
         address winningPlayer;
         if (_winner == optionA) {
@@ -283,6 +340,11 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         emit PayoutSent();
     }
 
+    /**
+     * @notice Authorizes upgrades to the `Duel` implementation contract.
+     * @dev This function restricts upgrades to only the contract owner.
+     * @param newImplementation Address of the new implementation contract.
+     */
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}

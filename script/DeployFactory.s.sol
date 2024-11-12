@@ -11,18 +11,18 @@ contract DeployFactoryScript is Script {
 
     function run() public {
         // Set constructor parameters for DuelFactory
-        address duelImplementation = 0xC42c74D173a1d8a655f5f310e29bcCD819284d1e;
+        address duelImplementation = 0x83dE1e7C435007bBe759735D7Ece548a42897dCa;
         address duelWallet = 0x60f2A726977b1199fAdc6FB38d600a1b277Dfd74;
         uint256 duelFee = 100; // example fee in basis points (1%)
 
         DefenderOptions memory opts;
-        opts.salt = "0x1234";
+        opts.salt = "0x12345";
         opts.useDefenderDeploy = true;
 
         // Deploy DuelFactory using OpenZeppelin Defender
         address deployResponse = Defender.deployContract(
             "DuelFactory.sol",
-            abi.encode(duelImplementation, duelWallet, duelFee),
+            abi.encode(duelWallet, duelImplementation, duelWallet, duelFee),
             opts
         );
 

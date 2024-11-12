@@ -17,7 +17,6 @@ error DuelFactory__InvalidPlayerB();
 error DuelFactory__InvalidFee();
 
 contract DuelFactory is Ownable, Pausable {
-    
     uint256 private _nextDuelId;
     uint256 public duelFee; // Fee in basis points. E.g., 'duelFee = 125' -> 1.25%
     address public duelImplementation;
@@ -28,6 +27,13 @@ contract DuelFactory is Ownable, Pausable {
     event NewFee(uint256 indexed newFee);
     event NewDuelWallet(address indexed newWallet);
 
+    /**
+     * @dev Constructor to initialize the DuelFactory contract.
+     * @param _owner Address of the contract owner (admin).
+     * @param _duelImplementation Address of the `Duel` implementation contract.
+     * @param _duelWallet Address of the wallet for collecting duel fees.
+     * @param _duelFee The fee percentage in basis points (e.g., 125 for 1.25%).
+     */
     constructor(
         address _owner,
         address _duelImplementation,
@@ -42,6 +48,18 @@ contract DuelFactory is Ownable, Pausable {
         duelFee = _duelFee;
     }
 
+    /**
+     * @notice Creates a new duel by deploying a UUPS proxy for the `Duel` contract.
+     * @dev This function deploys a new proxy and two `DuelOption` contracts for the duel.
+     * @param _title Title of the duel.
+     * @param _payoutA Address for payout wallet of player A.
+     * @param _playerB Address of player B (the challenger).
+     * @param _amount The target amount of funding for both Option contracts in wei.
+     * @param _fundingDuration Duration in seconds for the funding period.
+     * @param _decisionLockDuration Duration in seconds for the decision lock period.
+     * @param _judge Address of the judge who can decide the duel outcome. If address(0), the duel will be decided by the players.
+     * @return The address of the newly created duel (proxy) contract.
+     */
     function createDuel(
         string memory _title,
         address _payoutA,
@@ -51,8 +69,6 @@ contract DuelFactory is Ownable, Pausable {
         uint256 _decisionLockDuration,
         address _judge
     ) external payable whenNotPaused returns (address) {
-        // check a min/max duration for fundingDuration?
-        // check a min/max duration for decisionLockDuration?
         if (_playerB == msg.sender || _playerB == address(0))
             revert DuelFactory__InvalidPlayerB();
         if (_amount == 0) revert DuelFactory__InvalidAmount();
@@ -103,6 +119,11 @@ contract DuelFactory is Ownable, Pausable {
         return address(proxy);
     }
 
+    /**
+     * @notice Sets a new implementation address for deploying UUPS proxies.
+     * @dev Only the contract owner can call this function.
+     * @param _newImplementation The address of the new `Duel` implementation contract.
+     */
     function setImplementation(address _newImplementation) external onlyOwner {
         if (_newImplementation.code.length == 0)
             revert DuelFactory__InvalidImplementation();
@@ -110,21 +131,39 @@ contract DuelFactory is Ownable, Pausable {
         emit NewImplementation(_newImplementation);
     }
 
+    /**
+     * @notice Sets a new wallet address for collecting duel fees.
+     * @dev Only the contract owner can call this function.
+     * @param _newWallet The address of the new duel wallet.
+     */
     function setDuelWallet(address _newWallet) external onlyOwner {
         duelWallet = _newWallet;
         emit NewDuelWallet(_newWallet);
     }
 
+    /**
+     * @notice Updates the fee percentage for new duels.
+     * @dev Only the contract owner can call this function.
+     * @param _newFee The new fee percentage in basis points (e.g., 125 for 1.25%).
+     */
     function setFee(uint256 _newFee) external onlyOwner {
         if (_newFee > 10000) revert DuelFactory__InvalidFee(); // Max 100% in basis points
         duelFee = _newFee;
         emit NewFee(_newFee);
     }
 
+    /**
+     * @notice Pauses duel creation and updates by the factory.
+     * @dev Only the contract owner can call this function.
+     */
     function pause() external onlyOwner whenNotPaused {
         _pause();
     }
 
+    /**
+     * @notice Resumes duel creation and updates by the factory.
+     * @dev Only the contract owner can call this function.
+     */
     function unpause() external onlyOwner whenPaused {
         _unpause();
     }
