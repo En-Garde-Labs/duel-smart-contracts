@@ -59,7 +59,9 @@ Users fund an option by sending ether directly to the DuelOption contract. Each 
 ## Built With:
 
 Framework: [Foundry](https://book.getfoundry.sh/)
+
 Language: [Solidity](https://soliditylang.org/)
+
 Smart Contracts Libraries & Operations: [OpenZeppelin](https://openzeppelin.com/)
 
 
