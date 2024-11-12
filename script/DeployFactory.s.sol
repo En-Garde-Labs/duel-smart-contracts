@@ -15,7 +15,6 @@ contract DeployFactoryScript is Script {
         address duelWallet = 0x7611A60c2346f3D193f65B051eD6Ae93239FF25e;
         uint256 duelFee = 100; // example fee in basis points (1%)
         address multisig = vm.envAddress("BASE_SEPOLIA_MULTISIG");
-        address owner = 0x65AC8b2f35A8CE197c600C3f7375ca28074110c6;
 
         DefenderOptions memory opts;
         opts.salt = generateRandomSalt();
@@ -24,7 +23,7 @@ contract DeployFactoryScript is Script {
         // Deploy DuelFactory using OpenZeppelin Defender
         address deployResponse = Defender.deployContract(
             "DuelFactory.sol",
-            abi.encode(owner, duelImplementation, duelWallet, duelFee),
+            abi.encode(multisig, duelImplementation, duelWallet, duelFee),
             opts
         );
 
