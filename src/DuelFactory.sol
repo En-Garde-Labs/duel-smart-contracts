@@ -10,7 +10,7 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 error DuelFactory__InvalidAddress();
 error DuelFactory__InvalidDurations();
-error DuelFactory__InvalidAmount();
+error DuelFactory__InvalidTargetAmount();
 error DuelFactory__InvalidETHValue();
 error DuelFactory__InvalidImplementation();
 error DuelFactory__InvalidPlayer();
@@ -19,6 +19,8 @@ error DuelFactory__InvalidFee();
 contract DuelFactory is Ownable, Pausable {
     uint256 private _nextDuelId;
     uint256 public duelFee; // Fee in basis points. E.g., 'duelFee = 125' -> 1.25%
+    uint256 public fundingDurationLimit;
+    uint256 public decisionLockDurationLimit;
     address public duelImplementation;
     address public duelWallet;
 
@@ -54,7 +56,7 @@ contract DuelFactory is Ownable, Pausable {
      * @param _title Title of the duel.
      * @param _payoutA Address for payout wallet of player A.
      * @param _playerB Address of player B (the challenger).
-     * @param _amount The target amount of funding for both Option contracts in wei.
+     * @param _targetAmount The target amount of funding for both Option contracts in wei.
      * @param _fundingDuration Duration in seconds for the funding period.
      * @param _decisionLockDuration Duration in seconds for the decision lock period.
      * @param _judge Address of the judge who can decide the duel outcome. If address(0), the duel will be decided by the players.
@@ -64,7 +66,7 @@ contract DuelFactory is Ownable, Pausable {
         string memory _title,
         address _payoutA,
         address _playerB,
-        uint256 _amount,
+        uint256 _targetAmount,
         uint256 _fundingDuration,
         uint256 _decisionLockDuration,
         address _judge
@@ -75,10 +77,10 @@ contract DuelFactory is Ownable, Pausable {
             _playerB == _judge ||
             _judge == msg.sender
         ) revert DuelFactory__InvalidPlayer();
-        if (_amount == 0) revert DuelFactory__InvalidAmount();
-        if (msg.value == 0 || msg.value > _amount)
+        if (_targetAmount == 0) revert DuelFactory__InvalidTargetAmount();
+        if (msg.value == 0 || msg.value > _targetAmount)
             revert DuelFactory__InvalidETHValue();
-        if (_decisionLockDuration <= _fundingDuration)
+        if (_decisionLockDuration < _fundingDuration)
             revert DuelFactory__InvalidDurations();
         uint256 duelId = _nextDuelId++;
         ERC1967Proxy proxy = new ERC1967Proxy(
@@ -89,7 +91,7 @@ contract DuelFactory is Ownable, Pausable {
                 address(this),
                 duelWallet,
                 _title, // duel's title
-                _amount, // amount of the duel
+                _targetAmount, // amount of the duel
                 _payoutA, // payout wallet for option A
                 msg.sender, // player A
                 _playerB,
@@ -101,14 +103,14 @@ contract DuelFactory is Ownable, Pausable {
 
         DuelOption DuelOptionA = new DuelOption{value: msg.value}(
             address(proxy),
-            _amount,
+            _targetAmount,
             _fundingDuration,
             duelFee,
             msg.sender
         );
         DuelOption DuelOptionB = new DuelOption(
             address(proxy),
-            _amount,
+            _targetAmount,
             _fundingDuration,
             duelFee,
             address(0) // No initial funder
