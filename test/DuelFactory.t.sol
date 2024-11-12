@@ -21,7 +21,7 @@ contract DuelFactoryTest is Test {
     error DuelFactory__InvalidAmount();
     error DuelFactory__InvalidETHValue();
     error DuelFactory__InvalidImplementation();
-    error DuelFactory__InvalidPlayerB();
+    error DuelFactory__InvalidPlayer();
     error DuelFactory__InvalidFee();
 
     // Events
@@ -94,7 +94,7 @@ contract DuelFactoryTest is Test {
         vm.deal(playerA, amount);
         vm.startPrank(playerA);
 
-        vm.expectRevert(DuelFactory__InvalidPlayerB.selector);
+        vm.expectRevert(DuelFactory__InvalidPlayer.selector);
 
         duelFactory.createDuel{value: amount}(
             title,

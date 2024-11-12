@@ -125,7 +125,7 @@ contract DuelOptionTest is Test {
     function testFundingDuelOptionAfterFundingTimeEnded() public {
         // Warp time beyond funding duration
         uint256 creationTime = duelOptionB.creationTime();
-        uint256 fundingTime = duelOptionB.fundingTime();
+        uint256 fundingTime = duelOptionB.fundingDuration();
         vm.warp(creationTime + fundingTime + 1);
 
         // Try to fund DuelOptionB after funding time ended

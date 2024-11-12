@@ -14,7 +14,7 @@ error DuelOption__BalanceIsZero();
 contract DuelOption {
     uint256 public amount;
     uint256 public creationTime;
-    uint256 public fundingTime;
+    uint256 public fundingDuration;
     uint256 public duelFee; // Fee in basis points. E.g., 'duelFee = 125' -> 1.25%
     address public duelAddress;
 
@@ -41,7 +41,7 @@ contract DuelOption {
         duelAddress = _duelAddress;
         amount = _amount;
         creationTime = block.timestamp;
-        fundingTime = _fundingTime;
+        fundingDuration = _fundingTime;
         duelFee = _duelFee;
         if (msg.value > 0) {
             balances[_initialFunder] = msg.value;
@@ -56,7 +56,7 @@ contract DuelOption {
      */
     receive() external payable {
         if (address(this).balance > amount) revert DuelOption__AmountExceeded();
-        if (block.timestamp > creationTime + fundingTime)
+        if (block.timestamp > creationTime + fundingDuration)
             revert DuelOption__FundingTimeEnded();
         balances[msg.sender] += msg.value;
     }
