@@ -13,7 +13,7 @@ error DuelFactory__InvalidDurations();
 error DuelFactory__InvalidAmount();
 error DuelFactory__InvalidETHValue();
 error DuelFactory__InvalidImplementation();
-error DuelFactory__InvalidPlayerB();
+error DuelFactory__InvalidPlayer();
 error DuelFactory__InvalidFee();
 
 contract DuelFactory is Ownable, Pausable {
@@ -69,8 +69,12 @@ contract DuelFactory is Ownable, Pausable {
         uint256 _decisionLockDuration,
         address _judge
     ) external payable whenNotPaused returns (address) {
-        if (_playerB == msg.sender || _playerB == address(0))
-            revert DuelFactory__InvalidPlayerB();
+        if (
+            _playerB == msg.sender ||
+            _playerB == address(0) ||
+            _playerB == _judge ||
+            _judge == msg.sender
+        ) revert DuelFactory__InvalidPlayer();
         if (_amount == 0) revert DuelFactory__InvalidAmount();
         if (msg.value == 0 || msg.value > _amount)
             revert DuelFactory__InvalidETHValue();
