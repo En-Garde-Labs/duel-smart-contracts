@@ -87,13 +87,26 @@ cd duel
 forge install
 ```
 
-3. Compile contracts
+3. Create a .env file in the root folder and populate it with the following keys and values
+
+```
+DEFENDER_KEY=
+DEFENDER_SECRET=
+TEST_DEPLOY_EOA=
+TEST_DEPLOY_PK=
+BASE_MAINNET_MULTISIG=
+BASE_MAINNET_RPC_URL=
+BASE_SEPOLIA_MULTISIG=
+BASE_SEPOLIA_RPC_URL=
+```
+
+4. Compile contracts
 
 ```
 forge build
 ```
 
-4. Run tests
+5. Run tests
 
 ```
 forge test -vvv
