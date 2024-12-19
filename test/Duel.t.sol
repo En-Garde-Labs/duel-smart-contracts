@@ -9,6 +9,7 @@ import {Duel} from "../src/Duel.sol";
 import {DuelOption} from "../src/DuelOption.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IDuel} from "../src/Duel.sol";
+import {SigUtils} from "./SigUtils.sol";
 
 contract DuelTest is Test {
     // Config contracts
@@ -44,11 +45,14 @@ contract DuelTest is Test {
     Duel duelNoJudge;
     address duelImplementationAddress;
     address duelWallet = makeAddr("duelWallet");
+    SigUtils sigUtilsWithJudge;
+    SigUtils sigUtilsNoJudge;
 
     // Users
     address playerA = address(0x1);
     address playerB = address(0x2);
     address judge = address(0x3);
+    address invitationSigner = vm.addr(0x4);
 
     // Test variables
     uint256 duelFee = 100; // Fee in basis points (1%)
@@ -65,6 +69,25 @@ contract DuelTest is Test {
 
         duelWithJudge = Duel(createDuelWithJudge(playerA));
         duelNoJudge = Duel(createDuelNoJudge(playerA));
+        (
+            ,
+            string memory name_wj,
+            string memory version_wj,
+            uint256 chainId_wj,
+            address verifyingContract_wj,
+            ,
+        ) = duelWithJudge.eip712Domain();
+        sigUtilsWithJudge = new SigUtils(name_wj, version_wj, chainId_wj, verifyingContract_wj);
+
+        (
+            ,
+            string memory name_nj,
+            string memory version_nj,
+            uint256 chainId_nj,
+            address verifyingContract_nj,
+            ,
+        ) = duelNoJudge.eip712Domain();
+        sigUtilsNoJudge = new SigUtils(name_nj, version_nj, chainId_nj, verifyingContract_nj);
     }
 
     function createDuelWithJudge(address player) public returns (address) {
@@ -76,11 +99,11 @@ contract DuelTest is Test {
         address duelWithJudgeAddr = duelFactory.createDuel{value: 1 ether}(
             "Test Duel",
             playerA, // payoutA
-            playerB,
             1 ether, // amount
             fundingDuration, // fundingDuration
             decisionLockDuration, // decisionLockDuration
-            judge
+            judge,
+            invitationSigner
         );
         vm.stopPrank();
 
@@ -96,11 +119,11 @@ contract DuelTest is Test {
         address duelNoJudgeAddr = duelFactory.createDuel{value: 1 ether}(
             "Test Duel No Judge",
             playerA, // payoutA
-            playerB,
             1 ether, // amount
             fundingDuration, // fundingDuration
             decisionLockDuration, // decisionLockDuration
-            address(0) // No judge
+            address(0), // No judge
+            invitationSigner
         );
         vm.stopPrank();
 
@@ -121,6 +144,18 @@ contract DuelTest is Test {
     }
 
     function testPlayerBAccept() public {
+        SigUtils.Invitation memory invitation = SigUtils.Invitation({
+            duelId: duelWithJudge.duelId(),
+            nonce: 1,
+            playerB: playerB
+        });
+        bytes32 digest = sigUtilsWithJudge.getTypedDataHash(invitation);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
+
+        // Concatenate r, s, and v into a single 65-byte signature
+        bytes memory signature = abi.encodePacked(r, s, v);
+        
         // Start impersonating playerB
         vm.startPrank(playerB);
 
@@ -130,7 +165,8 @@ contract DuelTest is Test {
         // Player B accepts the duel and sets payout address
         vm.expectEmit(true, false, false, false);
         emit ParticipantAccepted(playerB);
-        duelWithJudge.playerBAccept{value: 1 ether}(playerB); // Passing playerB as payout address
+
+        duelWithJudge.playerBAccept{value: 1 ether}(playerB, 1, signature); // Passing playerB as payout address
 
         // Check that playerBAccepted is true
         assertTrue(duelWithJudge.playerBAccepted());
@@ -138,6 +174,28 @@ contract DuelTest is Test {
         // Check that payoutAddresses[playerB] is set correctly
         assertEq(duelWithJudge.payoutAddresses(playerB), playerB);
 
+        vm.stopPrank();
+    }
+
+    function testPlayerBAcceptReplay() public {
+        SigUtils.Invitation memory invitation = SigUtils.Invitation({
+            duelId: duelWithJudge.duelId(),
+            nonce: 1,
+            playerB: playerB
+        });
+        bytes32 digest = sigUtilsWithJudge.getTypedDataHash(invitation);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
+
+        // Concatenate r, s, and v into a single 65-byte signature
+        bytes memory signature = abi.encodePacked(r, s, v);
+        
+        // Start impersonating playerB
+        vm.startPrank(playerB);
+        vm.deal(playerB, 2 ether);
+        duelWithJudge.playerBAccept{value: 1 ether}(playerB, 1, signature); // Passing playerB as payout address
+        vm.expectRevert();
+        duelWithJudge.playerBAccept{value: 1 ether}(playerB, 1, signature); // Passing playerB as payout address
         vm.stopPrank();
     }
 
@@ -157,6 +215,18 @@ contract DuelTest is Test {
     }
 
     function testDuelBecomesActiveAfterAcceptance() public {
+        SigUtils.Invitation memory invitation = SigUtils.Invitation({
+            duelId: duelWithJudge.duelId(),
+            nonce: 1,
+            playerB: playerB
+        });
+        bytes32 digest = sigUtilsWithJudge.getTypedDataHash(invitation);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
+
+        // Concatenate r, s, and v into a single 65-byte signature
+        bytes memory signature = abi.encodePacked(r, s, v);
+
         // Player A sets payout address
         vm.startPrank(playerA);
         duelWithJudge.setPayoutAddress(playerA);
@@ -165,7 +235,7 @@ contract DuelTest is Test {
         // Player B accepts
         vm.startPrank(playerB);
         vm.deal(playerB, 1 ether);
-        duelWithJudge.playerBAccept{value: 1 ether}(playerB); // Passing playerB as payout address
+        duelWithJudge.playerBAccept{value: 1 ether}(playerB, 1, signature); // Passing playerB as payout address
         vm.stopPrank();
 
         // Judge accepts
@@ -207,18 +277,27 @@ contract DuelTest is Test {
     }
 
     function testPlayersAgree() public {
-        // Use duel with no judge
-        duelNoJudge = Duel(createDuelNoJudge(playerA));
-
         // Player A sets payout address
         vm.startPrank(playerA);
         duelNoJudge.setPayoutAddress(playerA);
         vm.stopPrank();
 
+        SigUtils.Invitation memory invitation = SigUtils.Invitation({
+            duelId: duelNoJudge.duelId(),
+            nonce: 1,
+            playerB: playerB
+        });
+        bytes32 digest = sigUtilsNoJudge.getTypedDataHash(invitation);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
+
+        // Concatenate r, s, and v into a single 65-byte signature
+        bytes memory signature = abi.encodePacked(r, s, v);
+
         // Player B accepts
         vm.startPrank(playerB);
         vm.deal(playerB, 1 ether);
-        duelNoJudge.playerBAccept{value: 1 ether}(playerB); // Passing playerB as payout address
+        duelNoJudge.playerBAccept{value: 1 ether}(playerB, 1, signature); // Passing playerB as payout address
         vm.stopPrank();
 
         // Duel should be active now
