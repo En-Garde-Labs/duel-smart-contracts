@@ -8,6 +8,7 @@ import {DuelFactory} from "../src/DuelFactory.sol";
 import {Duel} from "../src/Duel.sol";
 import {DuelOption} from "../src/DuelOption.sol";
 import {IDuel} from "../src/Duel.sol";
+import {SigUtils} from "./SigUtils.sol";
 
 error DuelOption__AmountExceeded();
 error DuelImplementation__NotDecisionPeriod();
@@ -22,11 +23,13 @@ contract DuelFuzzTest is Test {
     Duel duel;
     DuelOption duelOptionA;
     DuelOption duelOptionB;
+    SigUtils sigUtils;
 
     // Test variables
     address playerA = address(0x1);
     address playerB = address(0x2);
     address judge = address(0x3);
+    address invitationSigner = vm.addr(0x4);
     uint256 amount = 0.01 ether;
     uint256 creationTime = block.timestamp;
     uint256 fundingDuration = 1 days;
@@ -42,16 +45,26 @@ contract DuelFuzzTest is Test {
         address duelAddress = duelFactory.createDuel{value: amount}(
             "Test Duel",
             playerA,
-            playerB,
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge
+            judge,
+            invitationSigner,
+            "1"
         );
 
         duel = Duel(duelAddress);
         duelOptionA = DuelOption(payable(duel.optionA()));
         duelOptionB = DuelOption(payable(duel.optionB()));
+        (
+            ,
+            string memory name,
+            string memory version,
+            uint256 chainId,
+            address verifyingContract,
+            ,
+        ) = duel.eip712Domain();
+        sigUtils = new SigUtils(name, version, chainId, verifyingContract);
     }
 
     // 1. Funding Limit Exceeded
@@ -137,9 +150,20 @@ contract DuelFuzzTest is Test {
     ) public {
         // Simulate playerB's acceptance if within the funding period
         if (playerBAccepts) {
+            SigUtils.Invitation memory invitation = SigUtils.Invitation({
+                duelId: duel.duelId(),
+                nonce: 1,
+                playerB: playerB
+            });
+            bytes32 digest = sigUtils.getTypedDataHash(invitation);
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
+
+            // Concatenate r, s, and v into a single 65-byte signature
+            bytes memory signature = abi.encodePacked(r, s, v);
             vm.deal(playerB, amount);
             vm.startPrank(playerB);
-            duel.playerBAccept{value: amount}(playerB);
+            duel.playerBAccept{value: amount}(playerB, 1, signature);
             duel.updateStatus(); // Manually trigger status update after acceptance
             vm.stopPrank();
         }

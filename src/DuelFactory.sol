@@ -53,28 +53,25 @@ contract DuelFactory is Ownable, Pausable {
      * @dev This function deploys a new proxy and two `DuelOption` contracts for the duel.
      * @param _title Title of the duel.
      * @param _payoutA Address for payout wallet of player A.
-     * @param _playerB Address of player B (the challenger).
      * @param _targetAmount The target amount of funding for both Option contracts in wei.
      * @param _fundingDuration Duration in seconds for the funding period.
      * @param _decisionLockDuration Duration in seconds for the decision lock period.
      * @param _judge Address of the judge who can decide the duel outcome. If address(0), the duel will be decided by the players.
+     * @param _invitationSigner Address of the signer of invitations (cannot be zero).
+     * @param _domainVersion EIP-712 compliant domainVersion.
      * @return The address of the newly created duel (proxy) contract.
      */
     function createDuel(
         string memory _title,
         address _payoutA,
-        address _playerB,
         uint256 _targetAmount,
         uint256 _fundingDuration,
         uint256 _decisionLockDuration,
-        address _judge
+        address _judge,
+        address _invitationSigner,
+        string memory _domainVersion
     ) external payable whenNotPaused returns (address) {
-        if (
-            _playerB == msg.sender ||
-            _playerB == address(0) ||
-            _playerB == _judge ||
-            _judge == msg.sender
-        ) revert DuelFactory__InvalidPlayer();
+        if (_judge == msg.sender) revert DuelFactory__InvalidPlayer();
         if (_targetAmount == 0) revert DuelFactory__InvalidTargetAmount();
         if (msg.value == 0 || msg.value > _targetAmount)
             revert DuelFactory__InvalidETHValue();
@@ -84,7 +81,7 @@ contract DuelFactory is Ownable, Pausable {
         ERC1967Proxy proxy = new ERC1967Proxy(
             duelImplementation,
             abi.encodeWithSignature(
-                "initialize(uint256,address,address,string,uint256,address,address,address,uint256,uint256,address)",
+                "initialize(uint256,address,address,string,uint256,address,address,uint256,uint256,address,address,string)",
                 duelId,
                 address(this),
                 duelWallet,
@@ -92,10 +89,11 @@ contract DuelFactory is Ownable, Pausable {
                 _targetAmount, // amount of the duel
                 _payoutA, // payout wallet for option A
                 msg.sender, // player A
-                _playerB,
                 _fundingDuration, // funding time limit
                 _decisionLockDuration, // deciding time starts
-                _judge // judge address
+                _judge, // judge address
+                _invitationSigner,
+                _domainVersion
             )
         );
 

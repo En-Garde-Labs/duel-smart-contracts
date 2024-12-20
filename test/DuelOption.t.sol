@@ -39,6 +39,7 @@ contract DuelOptionTest is Test {
     address playerA = address(0x1);
     address playerB = address(0x2);
     address judge = address(0x3);
+    address invitationSigner = address(0x4);
 
     // Test variables
     uint256 duelFee = 100; // Fee in basis points (1%)
@@ -62,11 +63,12 @@ contract DuelOptionTest is Test {
         address duelAddress = duelFactory.createDuel{value: amount}(
             "Test Duel",
             playerA, // payoutA
-            playerB,
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge
+            judge,
+            invitationSigner,
+            "1"
         );
         vm.stopPrank();
 

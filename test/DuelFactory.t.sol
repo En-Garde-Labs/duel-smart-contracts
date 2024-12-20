@@ -38,6 +38,7 @@ contract DuelFactoryTest is Test {
     address playerA = address(0x1);
     address playerB = address(0x2);
     address judge = address(0x3);
+    address invitationSigner = address(0x4);
 
     // Test variables
     uint256 duelFee = 100; // 1%
@@ -74,36 +75,12 @@ contract DuelFactoryTest is Test {
         duelFactory.createDuel{value: amount}(
             title,
             payoutA,
-            playerB,
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge
-        );
-
-        vm.stopPrank();
-    }
-
-    function testCreateDuelInvalidPlayerB() public {
-        string memory title = "Test Duel";
-        address payoutA = address(0x4);
-        uint256 amount = 1 ether;
-        uint256 fundingDuration = 3 days;
-        uint256 decisionLockDuration = 5 days;
-
-        vm.deal(playerA, amount);
-        vm.startPrank(playerA);
-
-        vm.expectRevert(DuelFactory__InvalidPlayer.selector);
-
-        duelFactory.createDuel{value: amount}(
-            title,
-            payoutA,
-            playerA, // Invalid: playerB is the same as playerA
-            amount,
-            fundingDuration,
-            decisionLockDuration,
-            judge
+            judge,
+            invitationSigner,
+            "1"
         );
 
         vm.stopPrank();
@@ -124,11 +101,12 @@ contract DuelFactoryTest is Test {
         duelFactory.createDuel{value: amount}(
             title,
             payoutA,
-            playerB,
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge
+            judge,
+            invitationSigner,
+            "1"
         );
 
         vm.stopPrank();
@@ -166,11 +144,12 @@ contract DuelFactoryTest is Test {
         duelFactory.createDuel{value: 1 ether}(
             "Test",
             address(0x0),
-            playerB,
             1 ether,
             1 days,
             2 days,
-            judge
+            judge,
+            invitationSigner,
+            "1"
         );
 
         // Only owner can call unpause
@@ -198,11 +177,12 @@ contract DuelFactoryTest is Test {
         duelFactory.createDuel{value: amount}(
             title,
             payoutA,
-            playerB,
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge
+            judge,
+            invitationSigner,
+            "1"
         );
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
@@ -243,11 +223,12 @@ contract DuelFactoryTest is Test {
         duelFactory.createDuel{value: amount}(
             title,
             payoutA,
-            playerB,
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge
+            judge,
+            invitationSigner,
+            "1"
         );
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
@@ -270,7 +251,7 @@ contract DuelFactoryTest is Test {
         // Check that the Duel contract has the correct values
         assertEq(duel.title(), title);
         assertEq(duel.playerA(), playerA);
-        assertEq(duel.playerB(), playerB);
+        assertEq(duel.playerB(), address(0));
         assertEq(duel.duelWallet(), duelWallet);
         assertEq(duel.factory(), address(duelFactory));
         assertEq(duel.judge(), judge);

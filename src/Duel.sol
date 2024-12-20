@@ -4,10 +4,13 @@ pragma solidity ^0.8.24;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {BitMaps} from "@openzeppelin/contracts/utils/structs/BitMaps.sol";
 
 error DuelImplementation__OnlyFactory();
 error DuelImplementation__OnlyJudge();
-error DuelImplementation__OnlyPlayerB();
+error DuelImplementation__UsedNonce();
 error DuelImplementation__FundingDurationExceeded();
 error DuelImplementation__AlreadyAccepted(address);
 error DuelImplementation__NotDecisionPeriod();
@@ -18,6 +21,8 @@ error DuelImplementation__PayoutFailed();
 error DuelImplementation__DuelExpired();
 error DuelImplementation__Unauthorized();
 error DuelImplementation__JudgeExists();
+error DuelImplementation__UnauthorizedInvitation();
+error DuelImplementation__InvalidInvitationSigner();
 
 interface IDuel {
     function setOptionsAddresses(address _optionA, address _optionB) external;
@@ -27,7 +32,9 @@ interface IDuel {
     function duelExpiredOrFinished() external view returns (bool);
 }
 
-contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
+contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
+    BitMaps.BitMap internal _processedNonces;
+
     uint256 public duelId;
     address public factory;
     address public duelWallet;
@@ -46,8 +53,12 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     uint256 public decisionLockDuration;
     string public title;
     bool public duelExpiredOrFinished;
+    address public invitationSigner;
     mapping(address player => address payoutAddress) public payoutAddresses;
     mapping(address player => bool) public playerAgreed;
+
+    bytes32 private constant PLAYER_INVITATION_TYPE_HASH = 
+        keccak256("InvitationVoucher(uint256 duelId,uint256 nonce,address playerB)");
 
     event ParticipantAccepted(address indexed participant);
     event PayoutAddressSet(
@@ -99,10 +110,11 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
      * @param _amount The target amount of funding for both Option contracts in wei.
      * @param _payoutA Address for player A's payout wallet.
      * @param _playerA Address of player A, the creator of the duel.
-     * @param _playerB Address of player B, the participant.
      * @param _fundingDuration Duration in seconds for the funding period.
      * @param _decisionLockDuration Duration in seconds for the decision lock period.
      * @param _judge Address of the judge for the duel (can be zero if no judge).
+     * @param _invitationSigner Address of the duel invitation signer (cannot be zero).
+     * @param _domainVersion EIP-712 compliant domainVersion.
      */
     function initialize(
         uint256 _duelId,
@@ -112,16 +124,20 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         uint256 _amount,
         address _payoutA,
         address _playerA,
-        address _playerB,
         uint256 _fundingDuration,
         uint256 _decisionLockDuration,
-        address _judge
+        address _judge,
+        address _invitationSigner,
+        string memory _domainVersion
     ) external initializer {
         __Ownable_init(_duelWallet);
+        __EIP712_init(_title, _domainVersion);
         __UUPSUpgradeable_init();
         if (_judge == address(0)) {
             judgeAccepted = true;
         }
+        if (_invitationSigner == address(0))
+            revert DuelImplementation__InvalidInvitationSigner();
         duelId = _duelId;
         factory = _factory;
         duelWallet = _duelWallet;
@@ -129,11 +145,11 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
         amount = _amount;
         payoutAddresses[_playerA] = _payoutA;
         playerA = _playerA;
-        playerB = _playerB;
         creationTime = block.timestamp;
         fundingDuration = _fundingDuration;
         decisionLockDuration = _decisionLockDuration;
         judge = _judge;
+        invitationSigner = _invitationSigner;
     }
 
     /**
@@ -159,16 +175,23 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
      * @notice Allows player B to accept the duel and fund their side.
      * @dev Only callable by player B during the funding period and requires ETH to fund OptionB contract.
      * @param _payoutB Address for player B's payout wallet.
+     * @param _nonce The nonce of the invitation.
+     * @param _signature The signature of the invitation to accept.
      * @return success Boolean indicating successful acceptance.
      */
     function playerBAccept(
-        address _payoutB
+        address _payoutB,
+        uint256 _nonce,
+        bytes memory _signature
     ) external payable onlyDuringFundingPeriod updatesStatus returns (bool) {
         if (playerBAccepted)
             revert DuelImplementation__AlreadyAccepted(playerB);
-        if (msg.sender != playerB) revert DuelImplementation__OnlyPlayerB();
         if (msg.value == 0) revert DuelImplementation__InvalidETHValue();
+        if (BitMaps.get(_processedNonces, _nonce)) revert DuelImplementation__UsedNonce();
+        verifyPlayerInvitationSignature(_nonce, _signature);
+        BitMaps.set(_processedNonces, _nonce);
 
+        playerB = msg.sender;
         payoutAddresses[msg.sender] = _payoutB;
         playerBAccepted = true;
 
@@ -305,6 +328,28 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     }
 
     /**
+     * @notice Verifies that provided signature corresponds to a valid invitation.
+     * @dev This internal function follows the EIP-712 scheme for validating signed typed data.
+     * @param _nonce Nonce of the signature to prevent replay attacks.
+     * @param _signature Invitation signature to validate.
+     */
+    function verifyPlayerInvitationSignature(uint256 _nonce, bytes memory _signature) internal view {
+        bytes32 digest =
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        PLAYER_INVITATION_TYPE_HASH,
+                        duelId,
+                        _nonce,
+                        msg.sender
+                    )
+                )
+            );
+        address signer = ECDSA.recover(digest, _signature);
+        if (invitationSigner != signer) revert DuelImplementation__UnauthorizedInvitation();
+    }
+
+    /**
      * @notice Distributes the payout to the winner after a decision is made.
      * @dev This internal function calls `sendPayout` on both options to send funds to the winner and fee to the duel wallet.
      * @param _winner Address of the winning option (either optionA or optionB).
@@ -348,4 +393,6 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel {
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}
+
+    uint256[50] private __gap;
 }
