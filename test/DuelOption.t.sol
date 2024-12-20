@@ -67,7 +67,8 @@ contract DuelOptionTest is Test {
             fundingDuration,
             decisionLockDuration,
             judge,
-            invitationSigner
+            invitationSigner,
+            "1"
         );
         vm.stopPrank();
 

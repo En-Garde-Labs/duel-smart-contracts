@@ -114,6 +114,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
      * @param _decisionLockDuration Duration in seconds for the decision lock period.
      * @param _judge Address of the judge for the duel (can be zero if no judge).
      * @param _invitationSigner Address of the duel invitation signer (cannot be zero).
+     * @param _domainVersion EIP-712 compliant domainVersion.
      */
     function initialize(
         uint256 _duelId,
@@ -126,10 +127,11 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
         uint256 _fundingDuration,
         uint256 _decisionLockDuration,
         address _judge,
-        address _invitationSigner
+        address _invitationSigner,
+        string memory _domainVersion
     ) external initializer {
         __Ownable_init(_duelWallet);
-        __EIP712_init(_title, "1");
+        __EIP712_init(_title, _domainVersion);
         __UUPSUpgradeable_init();
         if (_judge == address(0)) {
             judgeAccepted = true;

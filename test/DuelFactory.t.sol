@@ -79,7 +79,8 @@ contract DuelFactoryTest is Test {
             fundingDuration,
             decisionLockDuration,
             judge,
-            invitationSigner
+            invitationSigner,
+            "1"
         );
 
         vm.stopPrank();
@@ -104,7 +105,8 @@ contract DuelFactoryTest is Test {
             fundingDuration,
             decisionLockDuration,
             judge,
-            invitationSigner
+            invitationSigner,
+            "1"
         );
 
         vm.stopPrank();
@@ -146,7 +148,8 @@ contract DuelFactoryTest is Test {
             1 days,
             2 days,
             judge,
-            invitationSigner
+            invitationSigner,
+            "1"
         );
 
         // Only owner can call unpause
@@ -178,7 +181,8 @@ contract DuelFactoryTest is Test {
             fundingDuration,
             decisionLockDuration,
             judge,
-            invitationSigner
+            invitationSigner,
+            "1"
         );
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
@@ -223,7 +227,8 @@ contract DuelFactoryTest is Test {
             fundingDuration,
             decisionLockDuration,
             judge,
-            invitationSigner
+            invitationSigner,
+            "1"
         );
 
         Vm.Log[] memory entries = vm.getRecordedLogs();

@@ -49,7 +49,8 @@ contract DuelFuzzTest is Test {
             fundingDuration,
             decisionLockDuration,
             judge,
-            invitationSigner
+            invitationSigner,
+            "1"
         );
 
         duel = Duel(duelAddress);

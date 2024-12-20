@@ -103,7 +103,8 @@ contract DuelTest is Test {
             fundingDuration, // fundingDuration
             decisionLockDuration, // decisionLockDuration
             judge,
-            invitationSigner
+            invitationSigner,
+            "1"
         );
         vm.stopPrank();
 
@@ -123,7 +124,8 @@ contract DuelTest is Test {
             fundingDuration, // fundingDuration
             decisionLockDuration, // decisionLockDuration
             address(0), // No judge
-            invitationSigner
+            invitationSigner,
+            "1"
         );
         vm.stopPrank();
 
