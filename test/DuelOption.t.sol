@@ -124,6 +124,30 @@ contract DuelOptionTest is Test {
         vm.stopPrank();
     }
 
+    function testFundingDuelOptionMultipleTransfersExceedingAmount() public {
+        DuelOption testDuelOption = new DuelOption(
+            address(duel),
+            amount,
+            fundingDuration,
+            duelFee,
+            playerA
+        );
+
+        vm.deal(playerA, 1.2 ether);
+
+        // Send first transfer (0.8 ether)
+        vm.startPrank(playerA);
+        (bool success1, ) = address(testDuelOption).call{value: 0.8 ether}("");
+        assertTrue(success1, "First transfer failed");
+
+        // Send second transfer (0.4 ether)
+        // This should revert as it would exceed the amount limit
+        vm.expectRevert(DuelOption__AmountExceeded.selector);
+        (bool success2, ) = address(testDuelOption).call{value: 0.4 ether}("");
+
+        vm.stopPrank();
+    }
+
     function testFundingDuelOptionAfterFundingTimeEnded() public {
         // Warp time beyond funding duration
         uint256 creationTime = duelOptionB.creationTime();

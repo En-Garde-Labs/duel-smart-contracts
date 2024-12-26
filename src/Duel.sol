@@ -110,8 +110,8 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
      * @param _amount The target amount of funding for both Option contracts in wei.
      * @param _payoutA Address for player A's payout wallet.
      * @param _playerA Address of player A, the creator of the duel.
-     * @param _fundingDuration Duration in seconds for the funding period.
-     * @param _decisionLockDuration Duration in seconds for the decision lock period.
+     * @param _fundingDuration Duration in seconds since duel creation for the funding period.
+     * @param _decisionLockDuration Duration in seconds since duel creation for the decision lock period.
      * @param _judge Address of the judge for the duel (can be zero if no judge).
      * @param _invitationSigner Address of the duel invitation signer (cannot be zero).
      * @param _domainVersion EIP-712 compliant domainVersion.
