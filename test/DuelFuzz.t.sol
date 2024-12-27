@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {HelperConfig} from "script/HelperConfig.s.sol";
-import {DeployTests} from "script/DeployTests.s.sol";
-import {DuelFactory} from "../src/DuelFactory.sol";
-import {Duel} from "../src/Duel.sol";
-import {DuelOption} from "../src/DuelOption.sol";
-import {IDuel} from "../src/Duel.sol";
-import {SigUtils} from "./SigUtils.sol";
+import { Test } from "forge-std/Test.sol";
+import { HelperConfig } from "script/HelperConfig.s.sol";
+import { DeployTests } from "script/DeployTests.s.sol";
+import { DuelFactory } from "../src/DuelFactory.sol";
+import { Duel } from "../src/Duel.sol";
+import { DuelOption } from "../src/DuelOption.sol";
+import { IDuel } from "../src/Duel.sol";
+import { SigUtils } from "./SigUtils.sol";
 
 error DuelOption__AmountExceeded();
 error DuelImplementation__NotDecisionPeriod();
@@ -43,7 +43,7 @@ contract DuelFuzzTest is Test {
         deploy = new DeployTests();
         (duel, duelFactory) = deploy.run();
 
-        address duelAddress = duelFactory.createDuel{value: amount}(
+        address duelAddress = duelFactory.createDuel{ value: amount }(
             "Test Duel",
             playerA,
             amount,
@@ -63,6 +63,7 @@ contract DuelFuzzTest is Test {
             uint256 chainId,
             address verifyingContract,
             ,
+
         ) = duel.eip712Domain();
         sigUtils = new SigUtils(name, version, chainId, verifyingContract);
     }
@@ -78,21 +79,15 @@ contract DuelFuzzTest is Test {
 
         // Determine remaining fundable amount based on current balance
         uint256 currentBalance = address(duelOptionA).balance;
-        uint256 availableFunding = currentBalance < amount
-            ? amount - currentBalance
-            : 0;
+        uint256 availableFunding = currentBalance < amount ? amount - currentBalance : 0;
 
         // If fundingAmount exceeds availableFunding, expect a revert due to funding limit exceeded
         if (fundingAmount > availableFunding) {
             vm.expectRevert(DuelOption__AmountExceeded.selector);
-            (bool success, ) = address(duelOptionA).call{value: fundingAmount}(
-                ""
-            );
+            (bool success, ) = address(duelOptionA).call{ value: fundingAmount }("");
         } else {
             // Within funding limit, expect the funding to succeed
-            (bool success, ) = address(duelOptionA).call{value: fundingAmount}(
-                ""
-            );
+            (bool success, ) = address(duelOptionA).call{ value: fundingAmount }("");
             assertTrue(success, "Funding within limit failed");
         }
 
@@ -100,10 +95,7 @@ contract DuelFuzzTest is Test {
     }
 
     // 2. Balances Tracking Invariant
-    function testFuzzBalancesTracking(
-        uint256 funder1Amount,
-        uint256 funder2Amount
-    ) public {
+    function testFuzzBalancesTracking(uint256 funder1Amount, uint256 funder2Amount) public {
         // Limit each funding amount so their sum does not exceed `amount`
         funder1Amount = bound(funder1Amount, 0, 0);
         funder2Amount = bound(funder2Amount, 0, 0);
@@ -119,18 +111,19 @@ contract DuelFuzzTest is Test {
 
         // Funder 1 funds Option A
         vm.startPrank(funder1);
-        (bool success1, ) = address(duelOptionA).call{value: funder1Amount}("");
+        (bool success1, ) = address(duelOptionA).call{ value: funder1Amount }("");
         assertTrue(success1, "Funding by funder1 failed");
         vm.stopPrank();
 
         // Funder 2 funds Option A
         vm.startPrank(funder2);
-        (bool success2, ) = address(duelOptionA).call{value: funder2Amount}("");
+        (bool success2, ) = address(duelOptionA).call{ value: funder2Amount }("");
         assertTrue(success2, "Funding by funder2 failed");
         vm.stopPrank();
 
         // Calculate expected total balance from funders
-        uint256 totalTrackedBalance = startingBalance + duelOptionA.balances(funder1) +
+        uint256 totalTrackedBalance = startingBalance +
+            duelOptionA.balances(funder1) +
             duelOptionA.balances(funder2);
         uint256 actualContractBalance = address(duelOptionA).balance;
 
@@ -163,7 +156,7 @@ contract DuelFuzzTest is Test {
             bytes memory signature = abi.encodePacked(r, s, v);
             vm.deal(playerB, amount);
             vm.startPrank(playerB);
-            duel.playerBAccept{value: amount}(playerB, nonce, signature);
+            duel.playerBAccept{ value: amount }(playerB, nonce, signature);
             duel.updateStatus(); // Manually trigger status update after acceptance
             vm.stopPrank();
             nonce++;
@@ -209,11 +202,7 @@ contract DuelFuzzTest is Test {
             }
         }
 
-        assertEq(
-            duelIsActive,
-            expectedActive,
-            "Active state mismatch within funding period"
-        );
+        assertEq(duelIsActive, expectedActive, "Active state mismatch within funding period");
     }
 
     // 4. Payout Distribution
@@ -222,7 +211,7 @@ contract DuelFuzzTest is Test {
 
         vm.deal(playerB, amount + extraAmount);
         vm.startPrank(playerB);
-        (bool success, ) = address(duelOptionB).call{value: amount}("");
+        (bool success, ) = address(duelOptionB).call{ value: amount }("");
         assertTrue(success, "Funding DuelOptionB failed");
         vm.stopPrank();
 
@@ -231,8 +220,7 @@ contract DuelFuzzTest is Test {
 
         uint256 payoutBefore = payoutAddress.balance;
         uint256 duelWalletBefore = duelWallet.balance;
-        uint256 totalBalance = address(duelOptionA).balance +
-            address(duelOptionB).balance;
+        uint256 totalBalance = address(duelOptionA).balance + address(duelOptionB).balance;
 
         vm.prank(address(duel));
         duelOptionA.sendPayout(payoutAddress, duelWallet);
@@ -242,16 +230,8 @@ contract DuelFuzzTest is Test {
         uint256 expectedFee = (totalBalance * duelFee) / 10000;
         uint256 expectedPayout = totalBalance - expectedFee;
 
-        assertEq(
-            payoutAddress.balance - payoutBefore,
-            expectedPayout,
-            "Incorrect payout"
-        );
-        assertEq(
-            duelWallet.balance - duelWalletBefore,
-            expectedFee,
-            "Incorrect fee"
-        );
+        assertEq(payoutAddress.balance - payoutBefore, expectedPayout, "Incorrect payout");
+        assertEq(duelWallet.balance - duelWalletBefore, expectedFee, "Incorrect fee");
     }
 
     // 5. Judge Decision Lock

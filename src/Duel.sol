@@ -2,11 +2,17 @@
 
 pragma solidity ^0.8.24;
 
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {BitMaps} from "@openzeppelin/contracts/utils/structs/BitMaps.sol";
+import {
+    UUPSUpgradeable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    EIP712Upgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { BitMaps } from "@openzeppelin/contracts/utils/structs/BitMaps.sol";
 
 error DuelImplementation__OnlyFactory();
 error DuelImplementation__OnlyJudge();
@@ -66,19 +72,12 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
     mapping(address player => bool) public playerAgreed;
 
     bytes32 private constant PLAYERB_INVITATION_TYPE_HASH =
-        keccak256(
-            "InvitationVoucher(uint256 duelId,uint256 nonce,address playerB)"
-        );
+        keccak256("InvitationVoucher(uint256 duelId,uint256 nonce,address playerB)");
     bytes32 private constant JUDGE_INVITATION_TYPE_HASH =
-        keccak256(
-            "InvitationVoucher(uint256 duelId,uint256 nonce,address judge)"
-        );
+        keccak256("InvitationVoucher(uint256 duelId,uint256 nonce,address judge)");
 
     event ParticipantAccepted(address indexed participant);
-    event PayoutAddressSet(
-        address indexed player,
-        address indexed payoutAddress
-    );
+    event PayoutAddressSet(address indexed player, address indexed payoutAddress);
     event DuelCompleted(address indexed winner);
     event DuelExpired();
     event PayoutSent();
@@ -92,10 +91,8 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
     modifier onlyDuringDecisionPeriod() {
         uint256 decisionStartTime = creationTime + decisionLockDuration;
         uint256 decisionEndTime = decisionStartTime + fundingDuration; // decisionDuration equals fundingDuration
-        if (
-            block.timestamp < decisionStartTime ||
-            block.timestamp > decisionEndTime
-        ) revert DuelImplementation__NotDecisionPeriod();
+        if (block.timestamp < decisionStartTime || block.timestamp > decisionEndTime)
+            revert DuelImplementation__NotDecisionPeriod();
         _;
     }
 
@@ -145,8 +142,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
         __Ownable_init(_duelWallet);
         __EIP712_init(_title, _domainVersion);
         __UUPSUpgradeable_init();
-        if (_invitationSigner == address(0))
-            revert DuelImplementation__InvalidInvitationSigner();
+        if (_invitationSigner == address(0)) revert DuelImplementation__InvalidInvitationSigner();
         duelId = _duelId;
         factory = _factory;
         duelWallet = _duelWallet;
@@ -170,8 +166,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
         bytes memory _signature
     ) external onlyDuringFundingPeriod updatesStatus returns (bool) {
         if (judgeAccepted) revert DuelImplementation__AlreadyAccepted(judge);
-        if (BitMaps.get(_processedNonces, _nonce))
-            revert DuelImplementation__UsedNonce();
+        if (BitMaps.get(_processedNonces, _nonce)) revert DuelImplementation__UsedNonce();
 
         verifyJudgeInvitationSignature(_nonce, _signature);
         BitMaps.set(_processedNonces, _nonce);
@@ -196,11 +191,9 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
         uint256 _nonce,
         bytes memory _signature
     ) external payable onlyDuringFundingPeriod updatesStatus returns (bool) {
-        if (playerBAccepted)
-            revert DuelImplementation__AlreadyAccepted(playerB);
+        if (playerBAccepted) revert DuelImplementation__AlreadyAccepted(playerB);
         if (msg.value == 0) revert DuelImplementation__InvalidETHValue();
-        if (BitMaps.get(_processedNonces, _nonce))
-            revert DuelImplementation__UsedNonce();
+        if (BitMaps.get(_processedNonces, _nonce)) revert DuelImplementation__UsedNonce();
         verifyPlayerInvitationSignature(_nonce, _signature);
         BitMaps.set(_processedNonces, _nonce);
 
@@ -208,7 +201,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
         payoutAddresses[msg.sender] = _payoutB;
         playerBAccepted = true;
 
-        (bool success, ) = optionB.call{value: msg.value}("");
+        (bool success, ) = optionB.call{ value: msg.value }("");
         if (!success) revert DuelImplementation__FundingFailed();
 
         emit ParticipantAccepted(playerB);
@@ -223,16 +216,9 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
      */
     function judgeDecide(
         address _winner
-    )
-        external
-        onlyDuringDecisionPeriod
-        updatesStatus
-        duelIsActive
-        returns (bool)
-    {
+    ) external onlyDuringDecisionPeriod updatesStatus duelIsActive returns (bool) {
         if (msg.sender != judge) revert DuelImplementation__OnlyJudge();
-        if (_winner != optionA && _winner != optionB)
-            revert DuelImplementation__InvalidWinner();
+        if (_winner != optionA && _winner != optionB) revert DuelImplementation__InvalidWinner();
 
         decisionMade = true;
         duelExpiredOrFinished = true; // Mark the duel as finished
@@ -249,27 +235,18 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
      */
     function playersAgree(
         address _winner
-    )
-        external
-        onlyDuringDecisionPeriod
-        updatesStatus
-        duelIsActive
-        returns (bool)
-    {
+    ) external onlyDuringDecisionPeriod updatesStatus duelIsActive returns (bool) {
         if (judge != address(0)) revert DuelImplementation__JudgeExists();
         if (msg.sender != playerA && msg.sender != playerB)
             revert DuelImplementation__Unauthorized();
-        if (_winner != optionA && _winner != optionB)
-            revert DuelImplementation__InvalidWinner();
-        if (playerAgreed[msg.sender])
-            revert DuelImplementation__AlreadyAccepted(msg.sender);
+        if (_winner != optionA && _winner != optionB) revert DuelImplementation__InvalidWinner();
+        if (playerAgreed[msg.sender]) revert DuelImplementation__AlreadyAccepted(msg.sender);
 
         if (agreedWinner == address(0)) {
             agreedWinner = _winner;
             playerAgreed[msg.sender] = true;
         } else {
-            if (agreedWinner != _winner)
-                revert DuelImplementation__InvalidWinner();
+            if (agreedWinner != _winner) revert DuelImplementation__InvalidWinner();
             playerAgreed[msg.sender] = true;
             if (playerAgreed[playerA] && playerAgreed[playerB]) {
                 decisionMade = true;
@@ -316,11 +293,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
     function updateStatus() public {
         // Check if funding time has ended without acceptance
         if (block.timestamp > creationTime + fundingDuration) {
-            if (
-                !playerBAccepted ||
-                optionA.balance < amount ||
-                optionB.balance < amount
-            ) {
+            if (!playerBAccepted || optionA.balance < amount || optionB.balance < amount) {
                 duelExpiredOrFinished = true;
                 emit DuelExpired();
                 return; // Early exit since duel has expired
@@ -350,18 +323,10 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
         bytes memory _signature
     ) internal view {
         bytes32 digest = _hashTypedDataV4(
-            keccak256(
-                abi.encode(
-                    PLAYERB_INVITATION_TYPE_HASH,
-                    duelId,
-                    _nonce,
-                    msg.sender
-                )
-            )
+            keccak256(abi.encode(PLAYERB_INVITATION_TYPE_HASH, duelId, _nonce, msg.sender))
         );
         address signer = ECDSA.recover(digest, _signature);
-        if (invitationSigner != signer)
-            revert DuelImplementation__UnauthorizedInvitation();
+        if (invitationSigner != signer) revert DuelImplementation__UnauthorizedInvitation();
     }
 
     /**
@@ -370,23 +335,12 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
      * @param _nonce Nonce of the signature to prevent replay attacks.
      * @param _signature Judge invitation signature to validate.
      */
-    function verifyJudgeInvitationSignature(
-        uint256 _nonce,
-        bytes memory _signature
-    ) internal view {
+    function verifyJudgeInvitationSignature(uint256 _nonce, bytes memory _signature) internal view {
         bytes32 digest = _hashTypedDataV4(
-            keccak256(
-                abi.encode(
-                    JUDGE_INVITATION_TYPE_HASH,
-                    duelId,
-                    _nonce,
-                    msg.sender
-                )
-            )
+            keccak256(abi.encode(JUDGE_INVITATION_TYPE_HASH, duelId, _nonce, msg.sender))
         );
         address signer = ECDSA.recover(digest, _signature);
-        if (invitationSigner != signer)
-            revert DuelImplementation__UnauthorizedInvitation();
+        if (invitationSigner != signer) revert DuelImplementation__UnauthorizedInvitation();
     }
 
     /**
@@ -406,21 +360,12 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
         address payoutAddress = payoutAddresses[winningPlayer];
 
         (bool sentPayoutA, ) = optionA.call(
-            abi.encodeWithSignature(
-                "sendPayout(address,address)",
-                payoutAddress,
-                duelWallet
-            )
+            abi.encodeWithSignature("sendPayout(address,address)", payoutAddress, duelWallet)
         );
         (bool sentPayoutB, ) = optionB.call(
-            abi.encodeWithSignature(
-                "sendPayout(address,address)",
-                payoutAddress,
-                duelWallet
-            )
+            abi.encodeWithSignature("sendPayout(address,address)", payoutAddress, duelWallet)
         );
-        if (!sentPayoutA || !sentPayoutB)
-            revert DuelImplementation__PayoutFailed();
+        if (!sentPayoutA || !sentPayoutB) revert DuelImplementation__PayoutFailed();
 
         emit PayoutSent();
     }
@@ -430,9 +375,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
      * @dev This function restricts upgrades to only the contract owner.
      * @param newImplementation Address of the new implementation contract.
      */
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     uint256[50] private __gap;
 }

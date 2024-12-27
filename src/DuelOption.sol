@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.24;
 
-import {IDuel} from "./Duel.sol";
+import { IDuel } from "./Duel.sol";
 
 error DuelOption__Unauthorized();
 error DuelOption__PayoutFailed();
@@ -56,8 +56,7 @@ contract DuelOption {
      */
     receive() external payable {
         if (address(this).balance > amount) revert DuelOption__AmountExceeded();
-        if (block.timestamp > creationTime + fundingDuration)
-            revert DuelOption__FundingTimeEnded();
+        if (block.timestamp > creationTime + fundingDuration) revert DuelOption__FundingTimeEnded();
         balances[msg.sender] += msg.value;
     }
 
@@ -77,8 +76,8 @@ contract DuelOption {
         if (msg.sender != duelAddress) revert DuelOption__Unauthorized();
         uint256 _duelFee = (address(this).balance * duelFee) / 10000;
         uint256 _payoutAmount = address(this).balance - _duelFee;
-        (bool payoutSuccess, ) = _payoutAddress.call{value: _payoutAmount}("");
-        (bool feeSuccess, ) = payable(_duelWallet).call{value: _duelFee}("");
+        (bool payoutSuccess, ) = _payoutAddress.call{ value: _payoutAmount }("");
+        (bool feeSuccess, ) = payable(_duelWallet).call{ value: _duelFee }("");
         if (!payoutSuccess || !feeSuccess) revert DuelOption__PayoutFailed();
         emit PayoutSent(_payoutAddress, address(this).balance);
         return true;
@@ -101,7 +100,7 @@ contract DuelOption {
         uint256 _amount = balances[msg.sender];
         if (_amount == 0) revert DuelOption__BalanceIsZero();
         balances[msg.sender] = 0;
-        (bool success, ) = msg.sender.call{value: _amount}("");
+        (bool success, ) = msg.sender.call{ value: _amount }("");
         if (!success) revert DuelOption__PayoutFailed();
         emit FundsClaimed(msg.sender, _amount);
     }

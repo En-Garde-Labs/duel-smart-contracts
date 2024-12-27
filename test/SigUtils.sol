@@ -10,14 +10,10 @@ contract SigUtils {
         );
 
     bytes32 public constant PLAYERB_INVITATION_TYPE_HASH =
-        keccak256(
-            "InvitationVoucher(uint256 duelId,uint256 nonce,address playerB)"
-        );
+        keccak256("InvitationVoucher(uint256 duelId,uint256 nonce,address playerB)");
 
     bytes32 public constant JUDGE_INVITATION_TYPE_HASH =
-        keccak256(
-            "InvitationVoucher(uint256 duelId,uint256 nonce,address judge)"
-        );
+        keccak256("InvitationVoucher(uint256 duelId,uint256 nonce,address judge)");
 
     constructor(
         string memory name,
@@ -82,11 +78,7 @@ contract SigUtils {
     ) public view returns (bytes32) {
         return
             keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    DOMAIN_SEPARATOR,
-                    getPlayerBStructHash(_invitation)
-                )
+                abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, getPlayerBStructHash(_invitation))
             );
     }
 
@@ -95,11 +87,7 @@ contract SigUtils {
     ) public view returns (bytes32) {
         return
             keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    DOMAIN_SEPARATOR,
-                    getJudgeStructHash(_invitation)
-                )
+                abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, getJudgeStructHash(_invitation))
             );
     }
 }

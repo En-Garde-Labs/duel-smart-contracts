@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console, Vm} from "forge-std/Test.sol";
-import {HelperConfig} from "script/HelperConfig.s.sol";
-import {DeployTests} from "script/DeployTests.s.sol";
-import {DuelFactory} from "../src/DuelFactory.sol";
-import {Duel} from "../src/Duel.sol";
-import {DuelOption} from "../src/DuelOption.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {IDuel} from "../src/Duel.sol";
-import {SigUtils} from "./SigUtils.sol";
+import { Test, console, Vm } from "forge-std/Test.sol";
+import { HelperConfig } from "script/HelperConfig.s.sol";
+import { DeployTests } from "script/DeployTests.s.sol";
+import { DuelFactory } from "../src/DuelFactory.sol";
+import { Duel } from "../src/Duel.sol";
+import { DuelOption } from "../src/DuelOption.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { IDuel } from "../src/Duel.sol";
+import { SigUtils } from "./SigUtils.sol";
 
 contract DuelTest is Test {
     // Config contracts
@@ -34,10 +34,7 @@ contract DuelTest is Test {
 
     // Events
     event ParticipantAccepted(address indexed participant);
-    event PayoutAddressSet(
-        address indexed player,
-        address indexed payoutAddress
-    );
+    event PayoutAddressSet(address indexed player, address indexed payoutAddress);
     event DuelCompleted(address indexed winner);
     event DuelExpired();
     event PayoutSent();
@@ -89,7 +86,7 @@ contract DuelTest is Test {
         vm.startPrank(player);
 
         // Player creates a duel
-        address duelWithJudgeAddr = duelFactory.createDuel{value: 1 ether}(
+        address duelWithJudgeAddr = duelFactory.createDuel{ value: 1 ether }(
             "Test Duel",
             playerA, // payoutA
             1 ether, // amount
@@ -117,12 +114,11 @@ contract DuelTest is Test {
     }
 
     function testPlayerBAccept() public {
-        SigUtils.PlayerBInvitation memory invitation = SigUtils
-            .PlayerBInvitation({
-                duelId: duel.duelId(),
-                nonce: nonce,
-                playerB: playerB
-            });
+        SigUtils.PlayerBInvitation memory invitation = SigUtils.PlayerBInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
+            playerB: playerB
+        });
         bytes32 digest = sigUtils.getPlayerBTypedDataHash(invitation);
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
@@ -140,7 +136,7 @@ contract DuelTest is Test {
         vm.expectEmit(true, false, false, false);
         emit ParticipantAccepted(playerB);
 
-        duel.playerBAccept{value: 1 ether}(playerB, nonce, signature); // Passing playerB as payout address
+        duel.playerBAccept{ value: 1 ether }(playerB, nonce, signature); // Passing playerB as payout address
 
         // Check that the playerB address is set correctly
         assertEq(duel.playerB(), playerB);
@@ -156,12 +152,11 @@ contract DuelTest is Test {
     }
 
     function testPlayerBAcceptReplay() public {
-        SigUtils.PlayerBInvitation memory invitation = SigUtils
-            .PlayerBInvitation({
-                duelId: duel.duelId(),
-                nonce: nonce,
-                playerB: playerB
-            });
+        SigUtils.PlayerBInvitation memory invitation = SigUtils.PlayerBInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
+            playerB: playerB
+        });
         bytes32 digest = sigUtils.getPlayerBTypedDataHash(invitation);
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
@@ -172,10 +167,10 @@ contract DuelTest is Test {
         // Start impersonating playerB
         vm.startPrank(playerB);
         vm.deal(playerB, 2 ether);
-        duel.playerBAccept{value: 1 ether}(playerB, nonce, signature); // Passing playerB as payout address
+        duel.playerBAccept{ value: 1 ether }(playerB, nonce, signature); // Passing playerB as payout address
 
         vm.expectRevert();
-        duel.playerBAccept{value: 1 ether}(playerB, nonce, signature); // Passing playerB as payout address
+        duel.playerBAccept{ value: 1 ether }(playerB, nonce, signature); // Passing playerB as payout address
         vm.stopPrank();
 
         nonce++;
@@ -216,33 +211,29 @@ contract DuelTest is Test {
         vm.stopPrank();
 
         // Judge accepts
-        SigUtils.PlayerBInvitation memory playerBInvitation = SigUtils
-            .PlayerBInvitation({
-                duelId: duel.duelId(),
-                nonce: nonce,
-                playerB: playerB
-            });
-        bytes32 digestPlayerB = sigUtils.getPlayerBTypedDataHash(
-            playerBInvitation
-        );
+        SigUtils.PlayerBInvitation memory playerBInvitation = SigUtils.PlayerBInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
+            playerB: playerB
+        });
+        bytes32 digestPlayerB = sigUtils.getPlayerBTypedDataHash(playerBInvitation);
         (uint8 vp, bytes32 rp, bytes32 sp) = vm.sign(0x4, digestPlayerB);
         bytes memory playerBSignature = abi.encodePacked(rp, sp, vp);
 
         // Player B accepts
         vm.startPrank(playerB);
         vm.deal(playerB, 1 ether);
-        duel.playerBAccept{value: 1 ether}(playerB, 1, playerBSignature); // Passing playerB as payout address
+        duel.playerBAccept{ value: 1 ether }(playerB, 1, playerBSignature); // Passing playerB as payout address
         vm.stopPrank();
 
         nonce++;
 
         // Judge accepts
-        SigUtils.JudgeInvitation memory judgeInvitation = SigUtils
-            .JudgeInvitation({
-                duelId: duel.duelId(),
-                nonce: nonce,
-                judge: judge
-            });
+        SigUtils.JudgeInvitation memory judgeInvitation = SigUtils.JudgeInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
+            judge: judge
+        });
         bytes32 digestJudge = sigUtils.getJudgeTypedDataHash(judgeInvitation);
         (uint8 vj, bytes32 rj, bytes32 sj) = vm.sign(0x4, digestJudge);
         bytes memory judgeSignature = abi.encodePacked(rj, sj, vj);
@@ -290,12 +281,11 @@ contract DuelTest is Test {
         duel.setPayoutAddress(playerA);
         vm.stopPrank();
 
-        SigUtils.PlayerBInvitation memory invitation = SigUtils
-            .PlayerBInvitation({
-                duelId: duel.duelId(),
-                nonce: nonce,
-                playerB: playerB
-            });
+        SigUtils.PlayerBInvitation memory invitation = SigUtils.PlayerBInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
+            playerB: playerB
+        });
         bytes32 digest = sigUtils.getPlayerBTypedDataHash(invitation);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
@@ -303,7 +293,7 @@ contract DuelTest is Test {
         // Player B accepts
         vm.startPrank(playerB);
         vm.deal(playerB, 1 ether);
-        duel.playerBAccept{value: 1 ether}(playerB, nonce, signature); // Passing playerB as payout address
+        duel.playerBAccept{ value: 1 ether }(playerB, nonce, signature); // Passing playerB as payout address
         vm.stopPrank();
 
         // Duel should be active now and playerB accepted
