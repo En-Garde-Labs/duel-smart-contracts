@@ -15,3 +15,7 @@ docs/
 
 # Dotenv file
 .env
+
+# IDE config files
+.cursorrules
+.vscode/

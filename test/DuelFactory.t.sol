@@ -78,7 +78,6 @@ contract DuelFactoryTest is Test {
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge,
             invitationSigner,
             "1"
         );
@@ -104,7 +103,6 @@ contract DuelFactoryTest is Test {
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge,
             invitationSigner,
             "1"
         );
@@ -147,7 +145,6 @@ contract DuelFactoryTest is Test {
             1 ether,
             1 days,
             2 days,
-            judge,
             invitationSigner,
             "1"
         );
@@ -180,7 +177,6 @@ contract DuelFactoryTest is Test {
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge,
             invitationSigner,
             "1"
         );
@@ -226,7 +222,6 @@ contract DuelFactoryTest is Test {
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge,
             invitationSigner,
             "1"
         );
@@ -254,7 +249,7 @@ contract DuelFactoryTest is Test {
         assertEq(duel.playerB(), address(0));
         assertEq(duel.duelWallet(), duelWallet);
         assertEq(duel.factory(), address(duelFactory));
-        assertEq(duel.judge(), judge);
+        assertEq(duel.judge(), address(0));
 
         // Verify DuelOption contracts
         address optionAAddress = duel.optionA();

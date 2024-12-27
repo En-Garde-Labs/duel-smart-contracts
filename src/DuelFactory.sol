@@ -56,7 +56,6 @@ contract DuelFactory is Ownable, Pausable {
      * @param _targetAmount The target amount of funding for both Option contracts in wei.
      * @param _fundingDuration Duration in seconds since duel creation for the funding period.
      * @param _decisionLockDuration Duration in seconds since duel creation for the decision lock period.
-     * @param _judge Address of the judge who can decide the duel outcome. If address(0), the duel will be decided by the players.
      * @param _invitationSigner Address of the signer of invitations (cannot be zero).
      * @param _domainVersion EIP-712 compliant domainVersion.
      * @return The address of the newly created duel (proxy) contract.
@@ -67,11 +66,9 @@ contract DuelFactory is Ownable, Pausable {
         uint256 _targetAmount,
         uint256 _fundingDuration,
         uint256 _decisionLockDuration,
-        address _judge,
         address _invitationSigner,
         string memory _domainVersion
     ) external payable whenNotPaused returns (address) {
-        if (_judge == msg.sender) revert DuelFactory__InvalidPlayer();
         if (_targetAmount == 0) revert DuelFactory__InvalidTargetAmount();
         if (msg.value == 0 || msg.value > _targetAmount)
             revert DuelFactory__InvalidETHValue();
@@ -81,7 +78,7 @@ contract DuelFactory is Ownable, Pausable {
         ERC1967Proxy proxy = new ERC1967Proxy(
             duelImplementation,
             abi.encodeWithSignature(
-                "initialize(uint256,address,address,string,uint256,address,address,uint256,uint256,address,address,string)",
+                "initialize(uint256,address,address,string,uint256,address,address,uint256,uint256,address,string)",
                 duelId,
                 address(this),
                 duelWallet,
@@ -91,7 +88,6 @@ contract DuelFactory is Ownable, Pausable {
                 msg.sender, // player A
                 _fundingDuration, // funding time limit
                 _decisionLockDuration, // deciding time starts
-                _judge, // judge address
                 _invitationSigner,
                 _domainVersion
             )

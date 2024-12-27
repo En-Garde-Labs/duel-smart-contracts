@@ -35,30 +35,44 @@ interface IDuel {
 contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
     BitMaps.BitMap internal _processedNonces;
 
-    uint256 public duelId;
+    /** duel properties **/
     address public factory;
-    address public duelWallet;
-    bool public judgeAccepted;
-    bool public playerBAccepted;
-    bool public decisionMade;
-    address public optionA;
-    address public optionB;
-    address public playerA;
-    address public playerB;
-    address public judge;
-    address public agreedWinner;
+    uint256 public duelId;
+    string public title;
     uint256 public amount;
     uint256 public creationTime;
     uint256 public fundingDuration;
     uint256 public decisionLockDuration;
-    string public title;
-    bool public duelExpiredOrFinished;
+    address public duelWallet;
     address public invitationSigner;
+
+    /** duel participants **/
+    address public playerA;
+    address public playerB;
+    address public judge;
+
+    /** duel options contracts **/
+    address public optionA;
+    address public optionB;
+
+    /** duel status **/
+    bool public judgeAccepted;
+    bool public playerBAccepted;
+    bool public decisionMade;
+    address public agreedWinner;
+    bool public duelExpiredOrFinished;
+
     mapping(address player => address payoutAddress) public payoutAddresses;
     mapping(address player => bool) public playerAgreed;
 
-    bytes32 private constant PLAYER_INVITATION_TYPE_HASH = 
-        keccak256("InvitationVoucher(uint256 duelId,uint256 nonce,address playerB)");
+    bytes32 private constant PLAYERB_INVITATION_TYPE_HASH =
+        keccak256(
+            "InvitationVoucher(uint256 duelId,uint256 nonce,address playerB)"
+        );
+    bytes32 private constant JUDGE_INVITATION_TYPE_HASH =
+        keccak256(
+            "InvitationVoucher(uint256 duelId,uint256 nonce,address judge)"
+        );
 
     event ParticipantAccepted(address indexed participant);
     event PayoutAddressSet(
@@ -112,7 +126,6 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
      * @param _playerA Address of player A, the creator of the duel.
      * @param _fundingDuration Duration in seconds since duel creation for the funding period.
      * @param _decisionLockDuration Duration in seconds since duel creation for the decision lock period.
-     * @param _judge Address of the judge for the duel (can be zero if no judge).
      * @param _invitationSigner Address of the duel invitation signer (cannot be zero).
      * @param _domainVersion EIP-712 compliant domainVersion.
      */
@@ -126,16 +139,12 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
         address _playerA,
         uint256 _fundingDuration,
         uint256 _decisionLockDuration,
-        address _judge,
         address _invitationSigner,
         string memory _domainVersion
     ) external initializer {
         __Ownable_init(_duelWallet);
         __EIP712_init(_title, _domainVersion);
         __UUPSUpgradeable_init();
-        if (_judge == address(0)) {
-            judgeAccepted = true;
-        }
         if (_invitationSigner == address(0))
             revert DuelImplementation__InvalidInvitationSigner();
         duelId = _duelId;
@@ -148,7 +157,6 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
         creationTime = block.timestamp;
         fundingDuration = _fundingDuration;
         decisionLockDuration = _decisionLockDuration;
-        judge = _judge;
         invitationSigner = _invitationSigner;
     }
 
@@ -157,14 +165,18 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
      * @dev Only callable by the judge during the funding period, and only once.
      * @return success Boolean indicating successful acceptance.
      */
-    function judgeAccept()
-        external
-        onlyDuringFundingPeriod
-        updatesStatus
-        returns (bool)
-    {
-        if (msg.sender != judge) revert DuelImplementation__OnlyJudge();
+    function judgeAccept(
+        uint256 _nonce,
+        bytes memory _signature
+    ) external onlyDuringFundingPeriod updatesStatus returns (bool) {
         if (judgeAccepted) revert DuelImplementation__AlreadyAccepted(judge);
+        if (BitMaps.get(_processedNonces, _nonce))
+            revert DuelImplementation__UsedNonce();
+
+        verifyJudgeInvitationSignature(_nonce, _signature);
+        BitMaps.set(_processedNonces, _nonce);
+
+        judge = msg.sender;
         judgeAccepted = true;
 
         emit ParticipantAccepted(judge);
@@ -187,7 +199,8 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
         if (playerBAccepted)
             revert DuelImplementation__AlreadyAccepted(playerB);
         if (msg.value == 0) revert DuelImplementation__InvalidETHValue();
-        if (BitMaps.get(_processedNonces, _nonce)) revert DuelImplementation__UsedNonce();
+        if (BitMaps.get(_processedNonces, _nonce))
+            revert DuelImplementation__UsedNonce();
         verifyPlayerInvitationSignature(_nonce, _signature);
         BitMaps.set(_processedNonces, _nonce);
 
@@ -304,7 +317,6 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
         // Check if funding time has ended without acceptance
         if (block.timestamp > creationTime + fundingDuration) {
             if (
-                !judgeAccepted ||
                 !playerBAccepted ||
                 optionA.balance < amount ||
                 optionB.balance < amount
@@ -333,20 +345,48 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
      * @param _nonce Nonce of the signature to prevent replay attacks.
      * @param _signature Invitation signature to validate.
      */
-    function verifyPlayerInvitationSignature(uint256 _nonce, bytes memory _signature) internal view {
-        bytes32 digest =
-            _hashTypedDataV4(
-                keccak256(
-                    abi.encode(
-                        PLAYER_INVITATION_TYPE_HASH,
-                        duelId,
-                        _nonce,
-                        msg.sender
-                    )
+    function verifyPlayerInvitationSignature(
+        uint256 _nonce,
+        bytes memory _signature
+    ) internal view {
+        bytes32 digest = _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    PLAYERB_INVITATION_TYPE_HASH,
+                    duelId,
+                    _nonce,
+                    msg.sender
                 )
-            );
+            )
+        );
         address signer = ECDSA.recover(digest, _signature);
-        if (invitationSigner != signer) revert DuelImplementation__UnauthorizedInvitation();
+        if (invitationSigner != signer)
+            revert DuelImplementation__UnauthorizedInvitation();
+    }
+
+    /**
+     * @notice Verifies that provided signature corresponds to a valid judge invitation.
+     * @dev This internal function follows the EIP-712 scheme for validating signed typed data.
+     * @param _nonce Nonce of the signature to prevent replay attacks.
+     * @param _signature Judge invitation signature to validate.
+     */
+    function verifyJudgeInvitationSignature(
+        uint256 _nonce,
+        bytes memory _signature
+    ) internal view {
+        bytes32 digest = _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    JUDGE_INVITATION_TYPE_HASH,
+                    duelId,
+                    _nonce,
+                    msg.sender
+                )
+            )
+        );
+        address signer = ECDSA.recover(digest, _signature);
+        if (invitationSigner != signer)
+            revert DuelImplementation__UnauthorizedInvitation();
     }
 
     /**

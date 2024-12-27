@@ -66,7 +66,6 @@ contract DuelOptionTest is Test {
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge,
             invitationSigner,
             "1"
         );

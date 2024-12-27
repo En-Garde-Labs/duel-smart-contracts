@@ -35,6 +35,7 @@ contract DuelFuzzTest is Test {
     uint256 fundingDuration = 1 days;
     uint256 decisionLockDuration = 2 days;
     uint256 duelFee = 100; // 1% fee
+    uint256 nonce = 1;
 
     function setUp() public {
         helperConfig = new HelperConfig();
@@ -48,7 +49,6 @@ contract DuelFuzzTest is Test {
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge,
             invitationSigner,
             "1"
         );
@@ -150,12 +150,12 @@ contract DuelFuzzTest is Test {
     ) public {
         // Simulate playerB's acceptance if within the funding period
         if (playerBAccepts) {
-            SigUtils.Invitation memory invitation = SigUtils.Invitation({
+            SigUtils.PlayerBInvitation memory invitation = SigUtils.PlayerBInvitation({
                 duelId: duel.duelId(),
-                nonce: 1,
+                nonce: nonce,
                 playerB: playerB
             });
-            bytes32 digest = sigUtils.getTypedDataHash(invitation);
+            bytes32 digest = sigUtils.getPlayerBTypedDataHash(invitation);
 
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
 
@@ -163,17 +163,30 @@ contract DuelFuzzTest is Test {
             bytes memory signature = abi.encodePacked(r, s, v);
             vm.deal(playerB, amount);
             vm.startPrank(playerB);
-            duel.playerBAccept{value: amount}(playerB, 1, signature);
+            duel.playerBAccept{value: amount}(playerB, nonce, signature);
             duel.updateStatus(); // Manually trigger status update after acceptance
             vm.stopPrank();
+            nonce++;
         }
 
         // Simulate judge's acceptance if within the funding period
         if (judgeAccepts) {
+            SigUtils.JudgeInvitation memory invitation = SigUtils.JudgeInvitation({
+                duelId: duel.duelId(),
+                nonce: nonce,
+                judge: judge
+            });
+            bytes32 digest = sigUtils.getJudgeTypedDataHash(invitation);
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
+
+            // Concatenate r, s, and v into a single 65-byte signature
+            bytes memory signature = abi.encodePacked(r, s, v);
             vm.startPrank(judge);
-            duel.judgeAccept();
+            duel.judgeAccept(nonce, signature);
             duel.updateStatus(); // Manually trigger status update after acceptance
             vm.stopPrank();
+            nonce++;
         }
 
         if (!withinFundingPeriod) {
@@ -182,13 +195,14 @@ contract DuelFuzzTest is Test {
         }
 
         // Check duel's expired or finished status against expected active status
-        bool duelStatus = duel.duelExpiredOrFinished();
+        bool duelExpiredOrFinished = duel.duelExpiredOrFinished();
+        bool duelIsActive = !duelExpiredOrFinished;
 
         bool expectedActive;
         if (withinFundingPeriod) {
             expectedActive = true;
         } else {
-            if (playerBAccepts && judgeAccepts) {
+            if (playerBAccepts) {
                 expectedActive = true;
             } else {
                 expectedActive = false;
@@ -196,7 +210,7 @@ contract DuelFuzzTest is Test {
         }
 
         assertEq(
-            !duelStatus,
+            duelIsActive,
             expectedActive,
             "Active state mismatch within funding period"
         );
