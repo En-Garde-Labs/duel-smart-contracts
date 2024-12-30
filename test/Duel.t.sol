@@ -151,7 +151,7 @@ contract DuelTest is Test {
         nonce++;
     }
 
-    function testPlayerBAcceptReplay() public {
+    function testPlayerBAcceptResistsReplayAttack() public {
         SigUtils.PlayerBInvitation memory invitation = SigUtils.PlayerBInvitation({
             duelId: duel.duelId(),
             nonce: nonce,
@@ -204,13 +204,13 @@ contract DuelTest is Test {
         nonce++;
     }
 
-    function testDuelBecomesActiveAfterAcceptance() public {
+    function testDuelBecomesActiveAfterBothAccept() public {
         // Player A sets payout address
         vm.startPrank(playerA);
         duel.setPayoutAddress(playerA);
         vm.stopPrank();
 
-        // Judge accepts
+        // Player B accepts
         SigUtils.PlayerBInvitation memory playerBInvitation = SigUtils.PlayerBInvitation({
             duelId: duel.duelId(),
             nonce: nonce,
@@ -242,22 +242,68 @@ contract DuelTest is Test {
         duel.judgeAccept(nonce, judgeSignature);
         vm.stopPrank();
 
+        // Warp time to after funding duration
+        uint256 creationTime = duel.creationTime();
+        uint256 fundingDurationValue = duel.fundingDuration();
+        uint256 fundingEndTime = creationTime + fundingDurationValue;
+        vm.warp(fundingEndTime + 1);
+
+        // Update status
+        duel.updateStatus();
+
         // Check that the duel is active
         assertTrue(duel.judgeAccepted());
         assertTrue(duel.playerBAccepted());
         assertFalse(duel.duelExpiredOrFinished());
     }
 
+    function testDuelBecomesActiveWithoutJudge() public {
+        // Player A sets payout address
+        vm.startPrank(playerA);
+        duel.setPayoutAddress(playerA);
+        vm.stopPrank();
+
+        // Player B accepts
+        SigUtils.PlayerBInvitation memory playerBInvitation = SigUtils.PlayerBInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
+            playerB: playerB
+        });
+        bytes32 digestPlayerB = sigUtils.getPlayerBTypedDataHash(playerBInvitation);
+        (uint8 vp, bytes32 rp, bytes32 sp) = vm.sign(0x4, digestPlayerB);
+        bytes memory playerBSignature = abi.encodePacked(rp, sp, vp);
+
+        // Player B accepts
+        vm.startPrank(playerB);
+        vm.deal(playerB, 1 ether);
+        duel.playerBAccept{ value: 1 ether }(playerB, 1, playerBSignature); // Passing playerB as payout address
+        vm.stopPrank();
+
+        // Warp time to after funding duration
+        uint256 creationTime = duel.creationTime();
+        uint256 fundingDurationValue = duel.fundingDuration();
+        uint256 fundingEndTime = creationTime + fundingDurationValue;
+        vm.warp(fundingEndTime + 1);
+
+        // Update status
+        duel.updateStatus();
+
+        // Check that the duel is active
+        assertFalse(duel.judgeAccepted());
+        assertTrue(duel.playerBAccepted());
+        assertFalse(duel.duelExpiredOrFinished());
+
+        nonce++;
+    }
+
     function testJudgeDecide() public {
         // Players and judge accept to activate the duel
-        testDuelBecomesActiveAfterAcceptance();
+        testDuelBecomesActiveAfterBothAccept();
 
         // Warp to decision period
         uint256 creationTime = duel.creationTime();
         uint256 decisionLockDurationValue = duel.decisionLockDuration();
-
         uint256 decisionStartTime = creationTime + decisionLockDurationValue;
-
         vm.warp(decisionStartTime + 1);
 
         // Start impersonating judge
@@ -298,14 +344,13 @@ contract DuelTest is Test {
 
         // Duel should be active now and playerB accepted
         assertTrue(duel.playerBAccepted());
+        assertFalse(duel.judgeAccepted());
         assertFalse(duel.duelExpiredOrFinished());
 
         // Warp to decision period
         uint256 creationTime = duel.creationTime();
         uint256 decisionLockDurationValue = duel.decisionLockDuration();
-
         uint256 decisionStartTime = creationTime + decisionLockDurationValue;
-
         vm.warp(decisionStartTime + 1);
 
         // Players agree on the winner (Option A)

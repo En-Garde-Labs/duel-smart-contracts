@@ -72,7 +72,11 @@ contract SigUtils {
             );
     }
 
-    // computes the hash of the fully encoded EIP-712 message for the domain, which can be used to recover the signer
+    /**
+     * @notice Computes the hash of the fully encoded EIP-712 message for the domain, which can be used to recover the signer
+     * @param _invitation The invitation to hash
+     * @return The hash of the invitation (digest)
+     */
     function getPlayerBTypedDataHash(
         PlayerBInvitation memory _invitation
     ) public view returns (bytes32) {

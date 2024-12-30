@@ -27,6 +27,7 @@ error DuelImplementation__PayoutFailed();
 error DuelImplementation__DuelExpired();
 error DuelImplementation__Unauthorized();
 error DuelImplementation__JudgeExists();
+error DuelImplementation__JudgeNotAccepted();
 error DuelImplementation__UnauthorizedInvitation();
 error DuelImplementation__InvalidInvitationSigner();
 
@@ -217,6 +218,7 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
     function judgeDecide(
         address _winner
     ) external onlyDuringDecisionPeriod updatesStatus duelIsActive returns (bool) {
+        if (judge == address(0)) revert DuelImplementation__JudgeNotAccepted();
         if (msg.sender != judge) revert DuelImplementation__OnlyJudge();
         if (_winner != optionA && _winner != optionB) revert DuelImplementation__InvalidWinner();
 
@@ -291,7 +293,9 @@ contract Duel is UUPSUpgradeable, OwnableUpgradeable, IDuel, EIP712Upgradeable {
      * @dev This function checks whether the funding or decision period has ended and marks the duel as expired if applicable.
      */
     function updateStatus() public {
-        // Check if funding time has ended without acceptance
+        if (duelExpiredOrFinished) return;
+
+        // Check if funding time has ended without acceptance => duel expired
         if (block.timestamp > creationTime + fundingDuration) {
             if (!playerBAccepted || optionA.balance < amount || optionB.balance < amount) {
                 duelExpiredOrFinished = true;
