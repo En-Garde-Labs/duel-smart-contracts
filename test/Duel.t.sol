@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console, Vm} from "forge-std/Test.sol";
-import {HelperConfig} from "script/HelperConfig.s.sol";
-import {DeployTests} from "script/DeployTests.s.sol";
-import {DuelFactory} from "../src/DuelFactory.sol";
-import {Duel} from "../src/Duel.sol";
-import {DuelOption} from "../src/DuelOption.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {IDuel} from "../src/Duel.sol";
-import {SigUtils} from "./SigUtils.sol";
+import { Test, console, Vm } from "forge-std/Test.sol";
+import { HelperConfig } from "script/HelperConfig.s.sol";
+import { DeployTests } from "script/DeployTests.s.sol";
+import { DuelFactory } from "../src/DuelFactory.sol";
+import { Duel } from "../src/Duel.sol";
+import { DuelOption } from "../src/DuelOption.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { IDuel } from "../src/Duel.sol";
+import { SigUtils } from "./SigUtils.sol";
 
 contract DuelTest is Test {
     // Config contracts
@@ -30,6 +30,7 @@ contract DuelTest is Test {
     error DuelImplementation__PayoutFailed();
     error DuelImplementation__DuelExpired();
     error DuelImplementation__Unauthorized();
+    error DuelImplementation__UsedNonce();
 
     // Events
     event ParticipantAccepted(address indexed participant);
@@ -41,12 +42,10 @@ contract DuelTest is Test {
     // Contracts
     DuelFactory duelFactory;
     Duel duelImplementation;
-    Duel duelWithJudge;
-    Duel duelNoJudge;
+    Duel duel;
+    SigUtils sigUtils;
     address duelImplementationAddress;
     address duelWallet = makeAddr("duelWallet");
-    SigUtils sigUtilsWithJudge;
-    SigUtils sigUtilsNoJudge;
 
     // Users
     address playerA = address(0x1);
@@ -58,6 +57,7 @@ contract DuelTest is Test {
     uint256 duelFee = 100; // Fee in basis points (1%)
     uint256 fundingDuration = 3 days;
     uint256 decisionLockDuration = 5 days;
+    uint256 nonce = 1;
 
     function setUp() public {
         helperConfig = new HelperConfig();
@@ -67,42 +67,31 @@ contract DuelTest is Test {
 
         duelImplementationAddress = address(duelImplementation);
 
-        duelWithJudge = Duel(createDuelWithJudge(playerA));
-        duelNoJudge = Duel(createDuelNoJudge(playerA));
+        duel = Duel(createDuel(playerA));
         (
             ,
-            string memory name_wj,
-            string memory version_wj,
-            uint256 chainId_wj,
-            address verifyingContract_wj,
+            string memory name,
+            string memory version,
+            uint256 chainId,
+            address verifyingContract,
             ,
-        ) = duelWithJudge.eip712Domain();
-        sigUtilsWithJudge = new SigUtils(name_wj, version_wj, chainId_wj, verifyingContract_wj);
 
-        (
-            ,
-            string memory name_nj,
-            string memory version_nj,
-            uint256 chainId_nj,
-            address verifyingContract_nj,
-            ,
-        ) = duelNoJudge.eip712Domain();
-        sigUtilsNoJudge = new SigUtils(name_nj, version_nj, chainId_nj, verifyingContract_nj);
+        ) = duel.eip712Domain();
+        sigUtils = new SigUtils(name, version, chainId, verifyingContract);
     }
 
-    function createDuelWithJudge(address player) public returns (address) {
+    function createDuel(address player) public returns (address) {
         // Provide ETH to player
         vm.deal(player, 1 ether);
         vm.startPrank(player);
 
         // Player creates a duel
-        address duelWithJudgeAddr = duelFactory.createDuel{value: 1 ether}(
+        address duelWithJudgeAddr = duelFactory.createDuel{ value: 1 ether }(
             "Test Duel",
             playerA, // payoutA
             1 ether, // amount
             fundingDuration, // fundingDuration
             decisionLockDuration, // decisionLockDuration
-            judge,
             invitationSigner,
             "1"
         );
@@ -111,53 +100,32 @@ contract DuelTest is Test {
         return duelWithJudgeAddr;
     }
 
-    function createDuelNoJudge(address player) public returns (address) {
-        // Provide ETH to player
-        vm.deal(player, 1 ether);
-        vm.startPrank(player);
-
-        // Player creates a duel with no judge
-        address duelNoJudgeAddr = duelFactory.createDuel{value: 1 ether}(
-            "Test Duel No Judge",
-            playerA, // payoutA
-            1 ether, // amount
-            fundingDuration, // fundingDuration
-            decisionLockDuration, // decisionLockDuration
-            address(0), // No judge
-            invitationSigner,
-            "1"
-        );
-        vm.stopPrank();
-
-        return duelNoJudgeAddr;
-    }
-
     function testPlayerASetPayoutAddress() public {
         // Start impersonating playerA
         vm.startPrank(playerA);
 
         // Player A sets payout address
-        duelWithJudge.setPayoutAddress(playerA);
+        duel.setPayoutAddress(playerA);
 
         // Check that payoutAddresses[playerA] is set correctly
-        assertEq(duelWithJudge.payoutAddresses(playerA), playerA);
+        assertEq(duel.payoutAddresses(playerA), playerA);
 
         vm.stopPrank();
     }
 
     function testPlayerBAccept() public {
-        SigUtils.Invitation memory invitation = SigUtils.Invitation({
-            duelId: duelWithJudge.duelId(),
-            nonce: 1,
+        SigUtils.PlayerBInvitation memory invitation = SigUtils.PlayerBInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
             playerB: playerB
         });
-        bytes32 digest = sigUtilsWithJudge.getTypedDataHash(invitation);
+        bytes32 digest = sigUtils.getPlayerBTypedDataHash(invitation);
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
 
         // Concatenate r, s, and v into a single 65-byte signature
         bytes memory signature = abi.encodePacked(r, s, v);
-        
+
         // Start impersonating playerB
         vm.startPrank(playerB);
 
@@ -168,99 +136,174 @@ contract DuelTest is Test {
         vm.expectEmit(true, false, false, false);
         emit ParticipantAccepted(playerB);
 
-        duelWithJudge.playerBAccept{value: 1 ether}(playerB, 1, signature); // Passing playerB as payout address
+        duel.playerBAccept{ value: 1 ether }(playerB, nonce, signature); // Passing playerB as payout address
+
+        // Check that the playerB address is set correctly
+        assertEq(duel.playerB(), playerB);
 
         // Check that playerBAccepted is true
-        assertTrue(duelWithJudge.playerBAccepted());
+        assertTrue(duel.playerBAccepted());
 
         // Check that payoutAddresses[playerB] is set correctly
-        assertEq(duelWithJudge.payoutAddresses(playerB), playerB);
+        assertEq(duel.payoutAddresses(playerB), playerB);
 
         vm.stopPrank();
+        nonce++;
     }
 
-    function testPlayerBAcceptReplay() public {
-        SigUtils.Invitation memory invitation = SigUtils.Invitation({
-            duelId: duelWithJudge.duelId(),
-            nonce: 1,
+    function testPlayerBAcceptResistsReplayAttack() public {
+        SigUtils.PlayerBInvitation memory invitation = SigUtils.PlayerBInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
             playerB: playerB
         });
-        bytes32 digest = sigUtilsWithJudge.getTypedDataHash(invitation);
+        bytes32 digest = sigUtils.getPlayerBTypedDataHash(invitation);
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
 
         // Concatenate r, s, and v into a single 65-byte signature
         bytes memory signature = abi.encodePacked(r, s, v);
-        
+
         // Start impersonating playerB
         vm.startPrank(playerB);
         vm.deal(playerB, 2 ether);
-        duelWithJudge.playerBAccept{value: 1 ether}(playerB, 1, signature); // Passing playerB as payout address
+        duel.playerBAccept{ value: 1 ether }(playerB, nonce, signature); // Passing playerB as payout address
+
         vm.expectRevert();
-        duelWithJudge.playerBAccept{value: 1 ether}(playerB, 1, signature); // Passing playerB as payout address
+        duel.playerBAccept{ value: 1 ether }(playerB, nonce, signature); // Passing playerB as payout address
         vm.stopPrank();
+
+        nonce++;
     }
 
     function testJudgeAccept() public {
+        SigUtils.JudgeInvitation memory invitation = SigUtils.JudgeInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
+            judge: judge
+        });
+        bytes32 digest = sigUtils.getJudgeTypedDataHash(invitation);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
         // Start impersonating judge
         vm.startPrank(judge);
 
         // Judge accepts the duel
         vm.expectEmit(true, false, false, false);
         emit ParticipantAccepted(judge);
-        duelWithJudge.judgeAccept();
+        duel.judgeAccept(nonce, signature);
 
         // Check that judgeAccepted is true
-        assertTrue(duelWithJudge.judgeAccepted());
+        assertTrue(duel.judgeAccepted());
+
+        // Check that judge is set correctly
+        assertEq(duel.judge(), judge);
 
         vm.stopPrank();
+        nonce++;
     }
 
-    function testDuelBecomesActiveAfterAcceptance() public {
-        SigUtils.Invitation memory invitation = SigUtils.Invitation({
-            duelId: duelWithJudge.duelId(),
-            nonce: 1,
-            playerB: playerB
-        });
-        bytes32 digest = sigUtilsWithJudge.getTypedDataHash(invitation);
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
-
-        // Concatenate r, s, and v into a single 65-byte signature
-        bytes memory signature = abi.encodePacked(r, s, v);
-
+    function testDuelBecomesActiveAfterBothAccept() public {
         // Player A sets payout address
         vm.startPrank(playerA);
-        duelWithJudge.setPayoutAddress(playerA);
+        duel.setPayoutAddress(playerA);
         vm.stopPrank();
+
+        // Player B accepts
+        SigUtils.PlayerBInvitation memory playerBInvitation = SigUtils.PlayerBInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
+            playerB: playerB
+        });
+        bytes32 digestPlayerB = sigUtils.getPlayerBTypedDataHash(playerBInvitation);
+        (uint8 vp, bytes32 rp, bytes32 sp) = vm.sign(0x4, digestPlayerB);
+        bytes memory playerBSignature = abi.encodePacked(rp, sp, vp);
 
         // Player B accepts
         vm.startPrank(playerB);
         vm.deal(playerB, 1 ether);
-        duelWithJudge.playerBAccept{value: 1 ether}(playerB, 1, signature); // Passing playerB as payout address
+        duel.playerBAccept{ value: 1 ether }(playerB, 1, playerBSignature); // Passing playerB as payout address
         vm.stopPrank();
+
+        nonce++;
 
         // Judge accepts
+        SigUtils.JudgeInvitation memory judgeInvitation = SigUtils.JudgeInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
+            judge: judge
+        });
+        bytes32 digestJudge = sigUtils.getJudgeTypedDataHash(judgeInvitation);
+        (uint8 vj, bytes32 rj, bytes32 sj) = vm.sign(0x4, digestJudge);
+        bytes memory judgeSignature = abi.encodePacked(rj, sj, vj);
+
         vm.startPrank(judge);
-        duelWithJudge.judgeAccept();
+        duel.judgeAccept(nonce, judgeSignature);
         vm.stopPrank();
 
+        // Warp time to after funding duration
+        uint256 creationTime = duel.creationTime();
+        uint256 fundingDurationValue = duel.fundingDuration();
+        uint256 fundingEndTime = creationTime + fundingDurationValue;
+        vm.warp(fundingEndTime + 1);
+
+        // Update status
+        duel.updateStatus();
+
         // Check that the duel is active
-        assertTrue(duelWithJudge.judgeAccepted());
-        assertTrue(duelWithJudge.playerBAccepted());
-        assertFalse(duelWithJudge.duelExpiredOrFinished());
+        assertTrue(duel.judgeAccepted());
+        assertTrue(duel.playerBAccepted());
+        assertFalse(duel.duelExpiredOrFinished());
+    }
+
+    function testDuelBecomesActiveWithoutJudge() public {
+        // Player A sets payout address
+        vm.startPrank(playerA);
+        duel.setPayoutAddress(playerA);
+        vm.stopPrank();
+
+        // Player B accepts
+        SigUtils.PlayerBInvitation memory playerBInvitation = SigUtils.PlayerBInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
+            playerB: playerB
+        });
+        bytes32 digestPlayerB = sigUtils.getPlayerBTypedDataHash(playerBInvitation);
+        (uint8 vp, bytes32 rp, bytes32 sp) = vm.sign(0x4, digestPlayerB);
+        bytes memory playerBSignature = abi.encodePacked(rp, sp, vp);
+
+        // Player B accepts
+        vm.startPrank(playerB);
+        vm.deal(playerB, 1 ether);
+        duel.playerBAccept{ value: 1 ether }(playerB, 1, playerBSignature); // Passing playerB as payout address
+        vm.stopPrank();
+
+        // Warp time to after funding duration
+        uint256 creationTime = duel.creationTime();
+        uint256 fundingDurationValue = duel.fundingDuration();
+        uint256 fundingEndTime = creationTime + fundingDurationValue;
+        vm.warp(fundingEndTime + 1);
+
+        // Update status
+        duel.updateStatus();
+
+        // Check that the duel is active
+        assertFalse(duel.judgeAccepted());
+        assertTrue(duel.playerBAccepted());
+        assertFalse(duel.duelExpiredOrFinished());
+
+        nonce++;
     }
 
     function testJudgeDecide() public {
         // Players and judge accept to activate the duel
-        testDuelBecomesActiveAfterAcceptance();
+        testDuelBecomesActiveAfterBothAccept();
 
         // Warp to decision period
-        uint256 creationTime = duelWithJudge.creationTime();
-        uint256 decisionLockDurationValue = duelWithJudge.decisionLockDuration();
-
+        uint256 creationTime = duel.creationTime();
+        uint256 decisionLockDurationValue = duel.decisionLockDuration();
         uint256 decisionStartTime = creationTime + decisionLockDurationValue;
-
         vm.warp(decisionStartTime + 1);
 
         // Start impersonating judge
@@ -268,77 +311,75 @@ contract DuelTest is Test {
 
         // Judge decides the winner (Option A)
         vm.expectEmit(true, false, false, false);
-        emit DuelCompleted(duelWithJudge.optionA());
-        duelWithJudge.judgeDecide(duelWithJudge.optionA());
+        emit DuelCompleted(duel.optionA());
+        duel.judgeDecide(duel.optionA());
 
         // Check that duelExpiredOrFinished is true
-        assertTrue(duelWithJudge.duelExpiredOrFinished());
-        assertTrue(duelWithJudge.decisionMade());
+        assertTrue(duel.duelExpiredOrFinished());
+        assertTrue(duel.decisionMade());
 
         vm.stopPrank();
     }
 
-    function testPlayersAgree() public {
+    function testNoJudgePlayersAgreeOnWinner() public {
         // Player A sets payout address
         vm.startPrank(playerA);
-        duelNoJudge.setPayoutAddress(playerA);
+        duel.setPayoutAddress(playerA);
         vm.stopPrank();
 
-        SigUtils.Invitation memory invitation = SigUtils.Invitation({
-            duelId: duelNoJudge.duelId(),
-            nonce: 1,
+        SigUtils.PlayerBInvitation memory invitation = SigUtils.PlayerBInvitation({
+            duelId: duel.duelId(),
+            nonce: nonce,
             playerB: playerB
         });
-        bytes32 digest = sigUtilsNoJudge.getTypedDataHash(invitation);
-
+        bytes32 digest = sigUtils.getPlayerBTypedDataHash(invitation);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x4, digest);
-
-        // Concatenate r, s, and v into a single 65-byte signature
         bytes memory signature = abi.encodePacked(r, s, v);
 
         // Player B accepts
         vm.startPrank(playerB);
         vm.deal(playerB, 1 ether);
-        duelNoJudge.playerBAccept{value: 1 ether}(playerB, 1, signature); // Passing playerB as payout address
+        duel.playerBAccept{ value: 1 ether }(playerB, nonce, signature); // Passing playerB as payout address
         vm.stopPrank();
 
-        // Duel should be active now
-        assertTrue(duelNoJudge.playerBAccepted());
-        assertFalse(duelNoJudge.duelExpiredOrFinished());
+        // Duel should be active now and playerB accepted
+        assertTrue(duel.playerBAccepted());
+        assertFalse(duel.judgeAccepted());
+        assertFalse(duel.duelExpiredOrFinished());
 
         // Warp to decision period
-        uint256 creationTime = duelNoJudge.creationTime();
-        uint256 decisionLockDurationValue = duelNoJudge.decisionLockDuration();
-
+        uint256 creationTime = duel.creationTime();
+        uint256 decisionLockDurationValue = duel.decisionLockDuration();
         uint256 decisionStartTime = creationTime + decisionLockDurationValue;
-
         vm.warp(decisionStartTime + 1);
 
         // Players agree on the winner (Option A)
         vm.startPrank(playerA);
-        duelNoJudge.playersAgree(duelNoJudge.optionA());
+        duel.playersAgree(duel.optionA());
         vm.stopPrank();
 
         vm.startPrank(playerB);
-        duelNoJudge.playersAgree(duelNoJudge.optionA());
+        duel.playersAgree(duel.optionA());
         vm.stopPrank();
 
         // Check that duelExpiredOrFinished is true
-        assertTrue(duelNoJudge.duelExpiredOrFinished());
-        assertTrue(duelNoJudge.decisionMade());
+        assertTrue(duel.duelExpiredOrFinished());
+        assertTrue(duel.decisionMade());
+
+        nonce++;
     }
 
     function testUpdateStatusToExpired() public {
         // Warp to after funding duration
-        uint256 creationTime = duelWithJudge.creationTime();
-        uint256 fundingDurationValue = duelWithJudge.fundingDuration();
+        uint256 creationTime = duel.creationTime();
+        uint256 fundingDurationValue = duel.fundingDuration();
 
         vm.warp(creationTime + fundingDurationValue + 1);
 
         // Update status
-        duelWithJudge.updateStatus();
+        duel.updateStatus();
 
         // Check that duelExpiredOrFinished is true
-        assertTrue(duelWithJudge.duelExpiredOrFinished());
+        assertTrue(duel.duelExpiredOrFinished());
     }
 }

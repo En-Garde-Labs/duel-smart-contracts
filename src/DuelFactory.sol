@@ -2,11 +2,11 @@
 
 pragma solidity ^0.8.24;
 
-import {IDuel} from "./Duel.sol";
-import {DuelOption} from "./DuelOption.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import { IDuel } from "./Duel.sol";
+import { DuelOption } from "./DuelOption.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 error DuelFactory__InvalidAddress();
 error DuelFactory__InvalidDurations();
@@ -54,9 +54,8 @@ contract DuelFactory is Ownable, Pausable {
      * @param _title Title of the duel.
      * @param _payoutA Address for payout wallet of player A.
      * @param _targetAmount The target amount of funding for both Option contracts in wei.
-     * @param _fundingDuration Duration in seconds for the funding period.
-     * @param _decisionLockDuration Duration in seconds for the decision lock period.
-     * @param _judge Address of the judge who can decide the duel outcome. If address(0), the duel will be decided by the players.
+     * @param _fundingDuration Duration in seconds since duel creation for the funding period.
+     * @param _decisionLockDuration Duration in seconds since duel creation for the decision lock period.
      * @param _invitationSigner Address of the signer of invitations (cannot be zero).
      * @param _domainVersion EIP-712 compliant domainVersion.
      * @return The address of the newly created duel (proxy) contract.
@@ -67,21 +66,17 @@ contract DuelFactory is Ownable, Pausable {
         uint256 _targetAmount,
         uint256 _fundingDuration,
         uint256 _decisionLockDuration,
-        address _judge,
         address _invitationSigner,
         string memory _domainVersion
     ) external payable whenNotPaused returns (address) {
-        if (_judge == msg.sender) revert DuelFactory__InvalidPlayer();
         if (_targetAmount == 0) revert DuelFactory__InvalidTargetAmount();
-        if (msg.value == 0 || msg.value > _targetAmount)
-            revert DuelFactory__InvalidETHValue();
-        if (_decisionLockDuration < _fundingDuration)
-            revert DuelFactory__InvalidDurations();
+        if (msg.value == 0 || msg.value > _targetAmount) revert DuelFactory__InvalidETHValue();
+        if (_decisionLockDuration < _fundingDuration) revert DuelFactory__InvalidDurations();
         uint256 duelId = _nextDuelId++;
         ERC1967Proxy proxy = new ERC1967Proxy(
             duelImplementation,
             abi.encodeWithSignature(
-                "initialize(uint256,address,address,string,uint256,address,address,uint256,uint256,address,address,string)",
+                "initialize(uint256,address,address,string,uint256,address,address,uint256,uint256,address,string)",
                 duelId,
                 address(this),
                 duelWallet,
@@ -91,13 +86,12 @@ contract DuelFactory is Ownable, Pausable {
                 msg.sender, // player A
                 _fundingDuration, // funding time limit
                 _decisionLockDuration, // deciding time starts
-                _judge, // judge address
                 _invitationSigner,
                 _domainVersion
             )
         );
 
-        DuelOption DuelOptionA = new DuelOption{value: msg.value}(
+        DuelOption DuelOptionA = new DuelOption{ value: msg.value }(
             address(proxy),
             _targetAmount,
             _fundingDuration,
@@ -112,10 +106,7 @@ contract DuelFactory is Ownable, Pausable {
             address(0) // No initial funder
         );
 
-        IDuel(address(proxy)).setOptionsAddresses(
-            address(DuelOptionA),
-            address(DuelOptionB)
-        );
+        IDuel(address(proxy)).setOptionsAddresses(address(DuelOptionA), address(DuelOptionB));
 
         emit DuelCreated(duelId, address(proxy));
         return address(proxy);
@@ -127,8 +118,7 @@ contract DuelFactory is Ownable, Pausable {
      * @param _newImplementation The address of the new `Duel` implementation contract.
      */
     function setImplementation(address _newImplementation) external onlyOwner {
-        if (_newImplementation.code.length == 0)
-            revert DuelFactory__InvalidImplementation();
+        if (_newImplementation.code.length == 0) revert DuelFactory__InvalidImplementation();
         duelImplementation = _newImplementation;
         emit NewImplementation(_newImplementation);
     }

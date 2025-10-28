@@ -2,13 +2,13 @@
 
 pragma solidity ^0.8.24;
 
-import {Test, console, Vm} from "forge-std/Test.sol";
-import {HelperConfig} from "script/HelperConfig.s.sol";
-import {DeployTests} from "script/DeployTests.s.sol";
-import {DuelFactory} from "src/DuelFactory.sol";
-import {Duel} from "src/Duel.sol";
-import {DuelOption} from "src/DuelOption.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Test, console, Vm } from "forge-std/Test.sol";
+import { HelperConfig } from "script/HelperConfig.s.sol";
+import { DeployTests } from "script/DeployTests.s.sol";
+import { DuelFactory } from "src/DuelFactory.sol";
+import { Duel } from "src/Duel.sol";
+import { DuelOption } from "src/DuelOption.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DuelFactoryTest is Test {
     // Config contracts
@@ -72,13 +72,12 @@ contract DuelFactoryTest is Test {
         vm.expectEmit(true, false, false, false);
         emit DuelCreated(0, address(0));
 
-        duelFactory.createDuel{value: amount}(
+        duelFactory.createDuel{ value: amount }(
             title,
             payoutA,
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge,
             invitationSigner,
             "1"
         );
@@ -98,13 +97,12 @@ contract DuelFactoryTest is Test {
 
         vm.expectRevert(DuelFactory__InvalidDurations.selector);
 
-        duelFactory.createDuel{value: amount}(
+        duelFactory.createDuel{ value: amount }(
             title,
             payoutA,
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge,
             invitationSigner,
             "1"
         );
@@ -132,7 +130,6 @@ contract DuelFactoryTest is Test {
         vm.expectRevert();
         duelFactory.pause();
 
-
         vm.prank(config.account);
         duelFactory.pause();
         assertTrue(duelFactory.paused());
@@ -141,13 +138,12 @@ contract DuelFactoryTest is Test {
         vm.deal(playerA, 1 ether);
         vm.prank(playerA);
         vm.expectRevert();
-        duelFactory.createDuel{value: 1 ether}(
+        duelFactory.createDuel{ value: 1 ether }(
             "Test",
             address(0x0),
             1 ether,
             1 days,
             2 days,
-            judge,
             invitationSigner,
             "1"
         );
@@ -174,13 +170,12 @@ contract DuelFactoryTest is Test {
 
         vm.recordLogs();
 
-        duelFactory.createDuel{value: amount}(
+        duelFactory.createDuel{ value: amount }(
             title,
             payoutA,
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge,
             invitationSigner,
             "1"
         );
@@ -220,13 +215,12 @@ contract DuelFactoryTest is Test {
 
         vm.recordLogs();
 
-        duelFactory.createDuel{value: amount}(
+        duelFactory.createDuel{ value: amount }(
             title,
             payoutA,
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge,
             invitationSigner,
             "1"
         );
@@ -254,7 +248,7 @@ contract DuelFactoryTest is Test {
         assertEq(duel.playerB(), address(0));
         assertEq(duel.duelWallet(), duelWallet);
         assertEq(duel.factory(), address(duelFactory));
-        assertEq(duel.judge(), judge);
+        assertEq(duel.judge(), address(0));
 
         // Verify DuelOption contracts
         address optionAAddress = duel.optionA();

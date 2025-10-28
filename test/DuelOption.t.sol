@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console, Vm} from "forge-std/Test.sol";
-import {HelperConfig} from "../script/HelperConfig.s.sol";
-import {DeployTests} from "../script/DeployTests.s.sol";
-import {DuelFactory} from "../src/DuelFactory.sol";
-import {Duel} from "../src/Duel.sol";
-import {DuelOption} from "../src/DuelOption.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Test, console, Vm } from "forge-std/Test.sol";
+import { HelperConfig } from "../script/HelperConfig.s.sol";
+import { DeployTests } from "../script/DeployTests.s.sol";
+import { DuelFactory } from "../src/DuelFactory.sol";
+import { Duel } from "../src/Duel.sol";
+import { DuelOption } from "../src/DuelOption.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DuelOptionTest is Test {
     // Config contracts
@@ -60,13 +60,12 @@ contract DuelOptionTest is Test {
         vm.deal(playerA, amount);
         vm.startPrank(playerA);
 
-        address duelAddress = duelFactory.createDuel{value: amount}(
+        address duelAddress = duelFactory.createDuel{ value: amount }(
             "Test Duel",
             playerA, // payoutA
             amount,
             fundingDuration,
             decisionLockDuration,
-            judge,
             invitationSigner,
             "1"
         );
@@ -83,27 +82,19 @@ contract DuelOptionTest is Test {
         // Player A has already funded DuelOptionA during duel creation
         // Let's check that the balance is correct
         uint256 balance = address(duelOptionA).balance;
-        assertEq(
-            balance,
-            amount,
-            "Incorrect balance in DuelOptionA after creation"
-        );
+        assertEq(balance, amount, "Incorrect balance in DuelOptionA after creation");
 
         // Now let's try to fund DuelOptionB
         vm.deal(playerB, amount);
         vm.startPrank(playerB);
 
         // Send funds to DuelOptionB
-        (bool success, ) = address(duelOptionB).call{value: amount}("");
+        (bool success, ) = address(duelOptionB).call{ value: amount }("");
         assertTrue(success, "Funding DuelOptionB failed");
 
         // Check that the balance is correct
         balance = address(duelOptionB).balance;
-        assertEq(
-            balance,
-            amount,
-            "Incorrect balance in DuelOptionB after funding"
-        );
+        assertEq(balance, amount, "Incorrect balance in DuelOptionB after funding");
 
         vm.stopPrank();
     }
@@ -116,10 +107,32 @@ contract DuelOptionTest is Test {
         vm.expectRevert(DuelOption__AmountExceeded.selector);
 
         // Attempt to send more than the amount
-        (bool success, ) = address(duelOptionA).call{value: amount + 0.1 ether}(
-            ""
-        );
+        (bool success, ) = address(duelOptionA).call{ value: amount + 0.1 ether }("");
         // The call will revert
+
+        vm.stopPrank();
+    }
+
+    function testFundingDuelOptionMultipleTransfersExceedingAmount() public {
+        DuelOption testDuelOption = new DuelOption(
+            address(duel),
+            amount,
+            fundingDuration,
+            duelFee,
+            playerA
+        );
+
+        vm.deal(playerA, 1.2 ether);
+
+        // Send first transfer (0.8 ether)
+        vm.startPrank(playerA);
+        (bool success1, ) = address(testDuelOption).call{ value: 0.8 ether }("");
+        assertTrue(success1, "First transfer failed");
+
+        // Send second transfer (0.4 ether)
+        // This should revert as it would exceed the amount limit
+        vm.expectRevert(DuelOption__AmountExceeded.selector);
+        (bool success2, ) = address(testDuelOption).call{ value: 0.4 ether }("");
 
         vm.stopPrank();
     }
@@ -136,7 +149,7 @@ contract DuelOptionTest is Test {
 
         vm.expectRevert(DuelOption__FundingTimeEnded.selector);
 
-        (bool success, ) = address(duelOptionB).call{value: amount}("");
+        (bool success, ) = address(duelOptionB).call{ value: amount }("");
         // The call will revert
 
         vm.stopPrank();
@@ -156,21 +169,13 @@ contract DuelOptionTest is Test {
         // First, fund DuelOptionB
         vm.deal(playerB, amount);
         vm.startPrank(playerB);
-        (bool success, ) = address(duelOptionB).call{value: amount}("");
+        (bool success, ) = address(duelOptionB).call{ value: amount }("");
         assertTrue(success, "Funding DuelOptionB failed");
         vm.stopPrank();
 
         // Ensure that both DuelOption contracts have the correct balance
-        assertEq(
-            address(duelOptionA).balance,
-            amount,
-            "Incorrect balance in DuelOptionA"
-        );
-        assertEq(
-            address(duelOptionB).balance,
-            amount,
-            "Incorrect balance in DuelOptionB"
-        );
+        assertEq(address(duelOptionA).balance, amount, "Incorrect balance in DuelOptionA");
+        assertEq(address(duelOptionB).balance, amount, "Incorrect balance in DuelOptionB");
 
         // Now, we need to impersonate the Duel contract to call sendPayout
         vm.prank(address(duel));
@@ -192,13 +197,8 @@ contract DuelOptionTest is Test {
         uint256 expectedFee = (totalAmount * duelFee) / 10000;
         uint256 expectedPayout = totalAmount - expectedFee;
 
-        uint256 payoutReceived = payoutAddress.balance -
-            balanceBeforePayoutAddress;
-        assertEq(
-            payoutReceived,
-            expectedPayout,
-            "Incorrect payout amount received"
-        );
+        uint256 payoutReceived = payoutAddress.balance - balanceBeforePayoutAddress;
+        assertEq(payoutReceived, expectedPayout, "Incorrect payout amount received");
 
         // Check that the duelWallet received the correct fee
         uint256 feeReceived = duelWallet.balance - balanceBeforeDuelWallet;
@@ -213,20 +213,14 @@ contract DuelOptionTest is Test {
         uint256 decisionLockDurationValue = duel.decisionLockDuration();
         uint256 decisionDuration = fundingDurationValue;
 
-        uint256 expiryTime = creationTime +
-            decisionLockDurationValue +
-            decisionDuration +
-            1;
+        uint256 expiryTime = creationTime + decisionLockDurationValue + decisionDuration + 1;
         vm.warp(expiryTime);
 
         // Update duel status
         duel.updateStatus();
 
         // Ensure the duel is expired or finished
-        assertTrue(
-            duel.duelExpiredOrFinished(),
-            "Duel is not expired or finished"
-        );
+        assertTrue(duel.duelExpiredOrFinished(), "Duel is not expired or finished");
 
         // Player A attempts to claim funds from DuelOptionA
         vm.startPrank(playerA);
@@ -273,26 +267,18 @@ contract DuelOptionTest is Test {
 
         // Fund testDuelOption with two different addresses
         vm.startPrank(funder1);
-        (bool success1, ) = address(testDuelOption).call{value: 0.5 ether}("");
+        (bool success1, ) = address(testDuelOption).call{ value: 0.5 ether }("");
         assertTrue(success1, "Funding by funder1 failed");
         vm.stopPrank();
 
         vm.startPrank(funder2);
-        (bool success2, ) = address(testDuelOption).call{value: 0.5 ether}("");
+        (bool success2, ) = address(testDuelOption).call{ value: 0.5 ether }("");
         assertTrue(success2, "Funding by funder2 failed");
         vm.stopPrank();
 
         // Check balances
-        assertEq(
-            testDuelOption.balances(funder1),
-            0.5 ether,
-            "Incorrect balance for funder1"
-        );
-        assertEq(
-            testDuelOption.balances(funder2),
-            0.5 ether,
-            "Incorrect balance for funder2"
-        );
+        assertEq(testDuelOption.balances(funder1), 0.5 ether, "Incorrect balance for funder1");
+        assertEq(testDuelOption.balances(funder2), 0.5 ether, "Incorrect balance for funder2");
 
         // Ensure the contract's total balance equals the amount
         assertEq(
